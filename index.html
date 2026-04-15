@@ -1,645 +1,755 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
-<title>Triolet Online</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
+// =====================================================
+//  TRIOLET ONLINE  –  index.js
+// =====================================================
 
-body{
-  background:#0f172a;
-  color:#e2e8f0;
-  font-family:'Segoe UI',system-ui,sans-serif;
-  min-height:100vh;
-  overflow-x:hidden;
-}
+const DISTRIB = {
+  0:9,1:9,2:8,3:8,4:7,5:8,6:6,
+  7:6,8:4,9:4,10:3,11:3,12:2,13:2,14:1,15:1
+};
 
-/* ===== HEADER ===== */
-header{
-  background:#1e293b;
-  padding:10px 20px;
-  border-bottom:3px solid #f59e0b;
-  display:flex;
-  align-items:center;
-  gap:10px;
-  position:sticky;
-  top:0;
-  z-index:50;
-}
-.logo{
-  width:30px;height:30px;
-  background:linear-gradient(135deg,#f59e0b,#d97706);
-  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
-  flex-shrink:0;
-}
-header h1{
-  font-size:clamp(1.1rem,3vw,1.6rem);
-  font-weight:800;
-  color:#f59e0b;
-}
+const SPECS = (function(){
+  const m = {};
+  function add(list,type){
+    list.forEach(s=>{
+      const r=s.charCodeAt(0)-65;
+      const c=parseInt(s.slice(1))-1;
+      m[r+','+c]=type;
+    });
+  }
+  add(['A8','B2','B14','H1','H15','N2','N14','O8'],'R');
+  add(['D8','E5','E11','H4','H12','K5','K11','L8'], 'D');
+  add(['B5','B11','E2','E14','K2','K14','N5','N11'],'T');
+  add(['H8'],'C');
+  return m;
+})();
 
-/* ===== LOBBY ===== */
-#screen-lobby{
-  max-width:420px;
-  margin:30px auto;
-  padding:0 16px;
-}
-.card{
-  background:#1e293b;
-  border-radius:12px;
-  padding:20px;
-  margin-bottom:16px;
-  border:1px solid #334155;
-}
-.card-title{
-  color:#fbbf24;
-  font-weight:700;
-  margin-bottom:14px;
-  font-size:1rem;
-}
-.field{
-  width:100%;
-  padding:11px 14px;
-  border-radius:8px;
-  border:1px solid #334155;
-  background:#0f172a;
-  color:#e2e8f0;
-  font-size:1rem;
-  margin-bottom:10px;
-  -webkit-appearance:none;
-}
-.field:focus{outline:none;border-color:#f59e0b;}
+let G       = null;
+let selIdx  = null;
+let echSel  = [];
+let jokerCB = null;
+let logMode = 'detail';
 
-/* ===== BOUTONS GÉNÉRAUX ===== */
-.btn{
-  display:block;
-  width:100%;
-  padding:13px;
-  border:none;
-  border-radius:9px;
-  font-size:0.9rem;
-  font-weight:700;
-  cursor:pointer;
-  transition:opacity .15s,transform .15s;
-  text-transform:uppercase;
-  letter-spacing:.5px;
-  -webkit-tap-highlight-color:transparent;
-}
-.btn:active{opacity:.8;transform:scale(.98);}
-.btn-green{background:#22c55e;color:#fff;}
-.btn-gray {background:#475569;color:#fff;}
-.btn-blue {background:#3b82f6;color:#fff;}
-.btn-red  {background:#ef4444;color:#fff;}
-
-/* ===== ÉCRAN JEU ===== */
-#screen-game{
-  display:none;
-  padding:8px;
+// =====================================================
+//  CRÉATION
+// =====================================================
+function newGame(players){
+  const sac=[];
+  Object.entries(DISTRIB).forEach(([v,q])=>{
+    for(let i=0;i<q;i++)
+      sac.push({val:parseInt(v),isJoker:false,jokerVal:null});
+  });
+  sac.push({val:null,isJoker:true,jokerVal:null});
+  sac.push({val:null,isJoker:true,jokerVal:null});
+  shuffle(sac);
+  sac.splice(0,3);
+  const joueurs=players.map((name,i)=>({
+    name,score:0,
+    hand:sac.splice(-3,3),
+    isAI:(name==='IA')
+  }));
+  return{
+    board:Array(15).fill(null).map(()=>Array(15).fill(null)),
+    sac,joueurs,
+    cur:0,first:true,
+    usedSp:new Set(),
+    pend:[],
+    rejouer:false,over:false
+  };
 }
 
-.game-wrap{
-  display:flex;
-  gap:10px;
-  align-items:flex-start;
-  justify-content:center;
-  flex-wrap:wrap;
+function shuffle(a){
+  for(let i=a.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+}
+function drawN(sac,n){
+  n=Math.min(n,sac.length);
+  return n>0?sac.splice(-n,n):[];
+}
+function ev(t){
+  if(!t)return null;
+  return t.isJoker?t.jokerVal:t.val;
+}
+function specAt(r,c){
+  const k=r+','+c;
+  if(G.usedSp.has(k))return null;
+  return SPECS[k]||null;
 }
 
-/* ===== ZONE PLATEAU + CHEVALET ===== */
-.board-zone{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:8px;
-  flex-shrink:0;
+// =====================================================
+//  PLATEAU VIRTUEL
+// =====================================================
+function vboard(){
+  const b=G.board.map(row=>row.map(c=>c?{...c}:null));
+  G.pend.forEach(p=>{
+    b[p.r][p.c]={val:p.val,isJoker:p.isJoker,jokerVal:p.jokerVal};
+  });
+  return b;
 }
 
-/* Plateau */
-.board-shell{
-  background:#0f2a5e;
-  border-radius:4px;
-  padding:3px;
-  box-shadow:0 8px 32px rgba(0,0,0,.6);
-  display:inline-block;
-}
-.board-grid-wrap{
-  display:grid;
-  grid-template-columns:var(--lbl) auto;
-  grid-template-rows:var(--lbl) auto;
-}
-.coord-corner{
-  width:var(--lbl);height:var(--lbl);
-  background:#0f2a5e;
-}
-.coord-cols{
-  display:flex;
-  background:#0f2a5e;
-}
-.coord-cols span{
-  width:var(--cs);
-  text-align:center;
-  font-size:var(--csf);
-  color:#7dd3fc;
-  font-weight:600;
-  line-height:var(--lbl);
-}
-.coord-rows{
-  display:flex;
-  flex-direction:column;
-  background:#0f2a5e;
-}
-.coord-rows span{
-  height:var(--cs);
-  width:var(--lbl);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:var(--csf);
-  color:#7dd3fc;
-  font-weight:600;
-}
-#board{
-  display:grid;
-  grid-template-columns:repeat(15,var(--cs));
-  grid-template-rows:repeat(15,var(--cs));
-  gap:1px;
-  background:#0a1f4a;
-}
-.cell{
-  width:var(--cs);height:var(--cs);
-  background:#1e4080;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  cursor:pointer;
-  position:relative;
-  transition:background .1s;
-  border-radius:1px;
-  -webkit-tap-highlight-color:transparent;
-  overflow:hidden;
-}
-.cell:hover{background:#28509a;}
-.cell.sp-R{background:#6d28d9;}
-.cell.sp-D{background:#2563eb;}
-.cell.sp-T{background:#16a34a;}
-.cell.sp-C{background:#d97706;}
-.cell.placeable{
-  background:#14532d !important;
-  box-shadow:inset 0 0 0 2px #4ade80;
-}
-.cell.placeable:hover{background:#166534 !important;}
-
-/* Labels cases spéciales */
-.cell-lbl{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  width:100%;height:100%;
-  pointer-events:none;
-  user-select:none;
-}
-.cell-lbl-text{
-  font-size:calc(var(--cs) * .36);
-  font-weight:900;
-  color:rgba(255,255,255,.97);
-  text-shadow:0 1px 3px rgba(0,0,0,.7);
-  line-height:1;
-  letter-spacing:-.5px;
-}
-.cell-lbl svg{
-  width:calc(var(--cs) * .58);
-  height:calc(var(--cs) * .58);
-  filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));
+function getLine(b,r,c,dr,dc){
+  let sr=r,sc=c;
+  while(sr-dr>=0&&sr-dr<15&&sc-dc>=0&&sc-dc<15
+        &&b[sr-dr][sc-dc]!==null){sr-=dr;sc-=dc;}
+  const line=[];
+  let cr=sr,cc=sc;
+  while(cr>=0&&cr<15&&cc>=0&&cc<15&&b[cr][cc]!==null){
+    line.push({r:cr,c:cc,tok:b[cr][cc]});
+    cr+=dr;cc+=dc;
+  }
+  return line;
 }
 
-/* Jetons plateau */
-.tok{
-  width:calc(var(--cs) - 4px);
-  height:calc(var(--cs) - 4px);
-  background:linear-gradient(145deg,#fef9e7,#f5d76e);
-  border-radius:3px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  color:#1a1a1a;
-  font-weight:900;
-  font-size:calc(var(--cs) * .4);
-  border:1.5px solid #c9a227;
-  box-shadow:0 2px 4px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.5);
-  position:relative;
-  user-select:none;
-  line-height:1;
-}
-.tok.joker{
-  background:linear-gradient(145deg,#fff3e0,#ffcc80);
-  color:#dc2626;
-  font-weight:900;
-}
-.tok.pending{
-  border:2px solid #22c55e;
-  box-shadow:0 0 6px rgba(34,197,94,.5),inset 0 1px 0 rgba(255,255,255,.5);
-  cursor:pointer;
-}
-.tok .jcorner{
-  position:absolute;
-  bottom:1px;right:2px;
-  font-size:calc(var(--cs) * .22);
-  font-weight:900;
-  color:#1a1a1a;
-  font-style:normal;
-  line-height:1;
-  background:rgba(255,255,255,.85);
-  border-radius:2px;
-  padding:0 2px;
+function affectedLines(){
+  const b=vboard(),res=[],seen=new Set();
+  G.pend.forEach(p=>{
+    [['H',0,1],['V',1,0]].forEach(([axis,dr,dc])=>{
+      const k=axis+(dr===0?p.r:p.c);
+      if(seen.has(k))return;
+      seen.add(k);
+      const l=getLine(b,p.r,p.c,dr,dc);
+      if(l.length>=2)res.push(l);
+    });
+  });
+  return res;
 }
 
-/* ===================================================
-   CHEVALET + BOUTONS CÔTE À CÔTE
-   =================================================== */
-.hand-action-row{
-  display:flex;
-  flex-direction:row;
-  gap:6px;
-  width:100%;
-  align-items:stretch;
+function adjFixed(r,c){
+  for(const[dr,dc]of[[-1,0],[1,0],[0,-1],[0,1]]){
+    const nr=r+dr,nc=c+dc;
+    if(nr>=0&&nr<15&&nc>=0&&nc<15&&G.board[nr][nc]!==null)
+      return true;
+  }
+  return false;
 }
 
-/* Colonnes de boutons verticaux */
-.vbtns{
-  display:flex;
-  flex-direction:column;
-  gap:6px;
-  flex-shrink:0;
+// =====================================================
+//  VALIDATION
+// =====================================================
+function validate(){
+  const p=G.pend;
+  if(p.length===0)
+    return fail('Sélectionnez un jeton puis cliquez sur le plateau');
+  if(p.length>3)
+    return fail('Maximum 3 jetons par tour');
+  if(p.some(x=>x.isJoker&&x.jokerVal===null))
+    return fail('Définissez la valeur du joker');
+
+  const rows=[...new Set(p.map(x=>x.r))];
+  const cols=[...new Set(p.map(x=>x.c))];
+  if(rows.length>1&&cols.length>1)
+    return fail('Les jetons doivent être sur la même ligne ou colonne');
+
+  if(G.first){
+    if(!p.some(x=>x.r===7&&x.c===7))
+      return fail('Le 1er jeton doit couvrir la case centrale H8');
+  }else{
+    if(!p.some(x=>adjFixed(x.r,x.c)))
+      return fail('Les jetons doivent être adjacents à un jeton en place');
+  }
+
+  const b=vboard();
+  for(const px of p){
+    for(const[dr,dc]of[[0,1],[1,0]]){
+      const line=getLine(b,px.r,px.c,dr,dc);
+      if(line.length<2)continue;
+      if(line.length>3)return fail('Maximum 3 jetons côte à côte');
+      const vals=line.map(l=>ev(l.tok));
+      if(vals.some(v=>v===null))return fail('La valeur du joker doit être définie');
+      const sum=vals.reduce((a,b)=>a+b,0);
+      if(line.length===2&&sum>15)return fail(`Cette paire fait ${sum} > 15`);
+      if(line.length===3&&sum!==15)return fail(`Ce trio fait ${sum} au lieu de 15`);
+    }
+  }
+
+  if(G.first){
+    const b2=vboard();
+    for(let r=0;r<14;r++){
+      for(let c=0;c<14;c++){
+        if(b2[r][c]&&b2[r+1][c]&&b2[r][c+1]&&b2[r+1][c+1]){
+          if(p.some(x=>(x.r===r||x.r===r+1)&&(x.c===c||x.c===c+1)))
+            return fail('Interdit de former un carré au 1er tour');
+        }
+      }
+    }
+  }
+
+  if(p.filter(x=>x.isJoker).length>=2)
+    return fail('Interdit de poser 2 jokers au même tour');
+
+  return{ok:true};
+}
+function fail(msg){return{ok:false,msg};}
+
+// =====================================================
+//  CALCUL DES POINTS
+// =====================================================
+function calcPoints(){
+  let total=0;
+  const lines=affectedLines();
+  const hasJok=G.pend.some(p=>p.isJoker);
+
+  // ── 1 seul jeton sans voisin (dont 1er coup case centrale) ──
+  if(G.pend.length===1&&lines.length===0){
+    const p=G.pend[0];
+    const sp=specAt(p.r,p.c);
+    const v=ev({val:p.val,isJoker:p.isJoker,jokerVal:p.jokerVal})||0;
+    if(sp==='C'||sp==='D'){
+      const pts=v*2;
+      G.usedSp.add(p.r+','+p.c);
+      total+=pts;
+      addLog(`Case ×2 : ${v} × 2 = ${pts} pts`,'p');
+    }else if(sp==='T'){
+      const pts=v*3;
+      G.usedSp.add(p.r+','+p.c);
+      total+=pts;
+      addLog(`Case ×3 : ${v} × 3 = ${pts} pts`,'p');
+    }else{
+      addLog(`Jeton ${v} posé — 0 pt (pas de paire)`,'i');
+    }
+    if(sp==='R'){
+      G.usedSp.add(p.r+','+p.c);
+      G.rejouer=true;
+      addLog('🔁 Case Rejouer !','g');
+    }
+    return total;
+  }
+
+  // ── Détection Triolet ──
+  let isTriolet=false,trioletLineId=-1;
+  if(G.pend.length===3&&!hasJok){
+    lines.forEach((line,idx)=>{
+      if(line.length!==3)return;
+      const allNew=line.every(l=>G.pend.some(p=>p.r===l.r&&p.c===l.c));
+      if(!allNew)return;
+      const sum=line.map(l=>ev(l.tok)).reduce((a,b)=>a+b,0);
+      if(sum===15){isTriolet=true;trioletLineId=idx;}
+    });
+  }
+
+  // ── Paires et Trios ──
+  lines.forEach((line,lineIdx)=>{
+    const vals=line.map(l=>ev(l.tok));
+    const sum=vals.reduce((a,b)=>a+b,0);
+    const len=line.length;
+
+    let mult=1,spKey=null;
+    for(const p of G.pend){
+      if(!line.some(l=>l.r===p.r&&l.c===p.c))continue;
+      const sp=specAt(p.r,p.c);
+      if(sp==='D'||sp==='C'){mult=2;spKey=p.r+','+p.c;break;}
+      if(sp==='T'){mult=3;spKey=p.r+','+p.c;break;}
+    }
+
+    if(len===3&&sum===15){
+      let pts=30*mult;
+      let msg=`Trio (${vals.join('+')}=15) ×${mult} = ${30*mult}`;
+      if(isTriolet&&lineIdx===trioletLineId){
+        pts+=50;
+        msg=`🎉 TRIOLET ! ${msg} + 50 = ${pts}`;
+      }
+      if(spKey)G.usedSp.add(spKey);
+      total+=pts;
+      addLog(msg,'p');
+
+    }else if(len===2){
+      let pts=0;
+      line.forEach(item=>{
+        const v=ev(item.tok)||0;
+        const isNew=G.pend.some(p=>p.r===item.r&&p.c===item.c);
+        if(isNew){
+          const sp=specAt(item.r,item.c);
+          if(sp==='D'||sp==='C'){pts+=v*2;G.usedSp.add(item.r+','+item.c);}
+          else if(sp==='T'){pts+=v*3;G.usedSp.add(item.r+','+item.c);}
+          else pts+=v;
+        }else pts+=v;
+      });
+      total+=pts;
+      addLog(`Paire (${vals.join('+')}=${sum}) → ${pts} pts`,'i');
+    }
+  });
+
+  // Case Rejouer dans paires/trios
+  G.pend.forEach(p=>{
+    if(specAt(p.r,p.c)==='R'){
+      G.usedSp.add(p.r+','+p.c);
+      G.rejouer=true;
+      addLog('🔁 Case Rejouer !','g');
+    }
+  });
+
+  return total;
 }
 
-/* Bouton vertical */
-.vbtn{
-  flex:1;
-  border:none;
-  border-radius:8px;
-  font-weight:800;
-  cursor:pointer;
-  transition:opacity .15s,transform .15s;
-  -webkit-tap-highlight-color:transparent;
-  /* Texte vertical */
-  writing-mode:vertical-lr;
-  transform:rotate(180deg);
-  padding:12px 0;
-  width:38px;           /* largeur fixe */
-  font-size:clamp(.55rem,.7vw,.72rem);
-  white-space:nowrap;
-  text-transform:uppercase;
-  letter-spacing:.4px;
-  text-align:center;
-}
-.vbtn:active{opacity:.75;transform:rotate(180deg) scale(.97);}
-.vbtn-green{background:#22c55e;color:#fff;}
-.vbtn-blue {background:#3b82f6;color:#fff;}
-.vbtn-gray {background:#475569;color:#fff;}
-.vbtn-red  {background:#ef4444;color:#fff;}
+// =====================================================
+//  JOUER UN COUP
+// =====================================================
+function playMove(){
+  const v=validate();
+  if(!v.ok){addLog('❌ '+v.msg,'b');return;}
 
-/* Chevalet (zone centrale) */
-.hand-zone{
-  background:#1e293b;
-  border:1px solid #334155;
-  border-radius:10px;
-  padding:10px 12px;
-  flex:1;
-  min-width:0;
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-}
-.hand-info{
-  font-size:.78rem;
-  color:#94a3b8;
-  margin-bottom:8px;
-  display:flex;
-  flex-wrap:wrap;
-  gap:6px;
-  align-items:center;
-  justify-content:space-between;
-}
-.hand-info strong{color:#fbbf24;}
-.hand-tokens{
-  display:flex;
-  gap:8px;
-  justify-content:center;
-  flex-wrap:wrap;
-  min-height:54px;
-  align-items:center;
+  const pts=calcPoints();
+  const pl=G.joueurs[G.cur];
+  pl.score+=pts;
+
+  // Log score — TOUJOURS affiché même en mode minimum
+  addLog(`✅ ${pl.name} : +${pts} pt${pts!==1?'s':''} → Total ${pl.score}`,'score');
+
+  G.pend.forEach(p=>{
+    G.board[p.r][p.c]={val:p.val,isJoker:p.isJoker,jokerVal:p.jokerVal};
+  });
+  const idxs=[...new Set(G.pend.map(p=>p.hi))].sort((a,b)=>b-a);
+  idxs.forEach(i=>pl.hand.splice(i,1));
+  pl.hand.push(...drawN(G.sac,idxs.length));
+
+  const rejouer=G.rejouer;
+  G.pend=[];selIdx=null;G.first=false;G.rejouer=false;
+
+  if(checkEnd())return;
+  if(rejouer){
+    render();
+    if(G.joueurs[G.cur].isAI)setTimeout(aiTurn,800);
+    return;
+  }
+  nextTurn();
 }
 
-/* Jetons chevalet */
-.htok{
-  width:52px;height:52px;
-  background:linear-gradient(145deg,#fef9e7,#f5d76e);
-  border-radius:7px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  color:#1a1a1a;
-  font-weight:900;
-  font-size:1.25rem;
-  border:2px solid transparent;
-  cursor:pointer;
-  box-shadow:0 3px 6px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.5);
-  transition:transform .15s,box-shadow .15s,border-color .15s;
-  -webkit-tap-highlight-color:transparent;
-  user-select:none;
+// =====================================================
+//  TOUR SUIVANT
+// =====================================================
+function nextTurn(){
+  G.cur=(G.cur+1)%G.joueurs.length;
+  G.pend=[];selIdx=null;
+  render();
+  if(G.joueurs[G.cur].isAI)setTimeout(aiTurn,800);
 }
-.htok:hover{
-  transform:translateY(-4px);
-  box-shadow:0 6px 12px rgba(0,0,0,.3);
-}
-.htok.sel{
-  border-color:#22c55e;
-  transform:translateY(-7px);
-  box-shadow:0 0 0 3px rgba(34,197,94,.35),0 8px 14px rgba(0,0,0,.3);
-}
-.htok.joker{
-  background:linear-gradient(145deg,#fff3e0,#ffcc80);
-  color:#dc2626;
-  font-weight:900;
-}
-.htok.ghost{
-  background:#1e293b;
-  box-shadow:inset 0 2px 4px rgba(0,0,0,.4);
-  cursor:default;
-  border-color:#334155;
-}
-.htok.ghost:hover{transform:none;box-shadow:inset 0 2px 4px rgba(0,0,0,.4);}
 
-/* ===== PANEL DROIT ===== */
-.side-panel{
-  width:250px;
-  flex-shrink:0;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
+// =====================================================
+//  FIN
+// =====================================================
+function checkEnd(){
+  const pl=G.joueurs[G.cur];
+  if(G.sac.length===0&&pl.hand.length===0){
+    let bonus=0;
+    G.joueurs.forEach((j,i)=>{
+      if(i===G.cur)return;
+      const s=j.hand.reduce((a,t)=>a+(ev(t)||0),0);
+      bonus+=s;
+      addLog(`${j.name} perd ${s} pts (jetons restants)`,'b');
+    });
+    pl.score+=bonus;
+    if(bonus>0)addLog(`${pl.name} +${bonus} pts bonus de fin`,'score');
+    G.over=true;
+    render();
+    setTimeout(showEnd,700);
+    return true;
+  }
+  return false;
 }
-.pcard{
-  background:#1e293b;
-  border-radius:10px;
-  padding:14px;
-  border:1px solid #334155;
+
+function showEnd(){
+  const sorted=[...G.joueurs].sort((a,b)=>b.score-a.score);
+  const medals=['🥇','🥈','🥉','4️⃣'];
+  document.getElementById('fin-scores').innerHTML=
+    sorted.map((j,i)=>
+      `<div class="finrow">
+         <span>${medals[i]} ${j.name}</span>
+         <span class="finpts">${j.score} pts</span>
+       </div>`
+    ).join('');
+  document.getElementById('modal-fin').classList.add('on');
 }
-.ptitle{
-  font-size:.78rem;
-  font-weight:700;
-  color:#fbbf24;
-  text-transform:uppercase;
-  letter-spacing:.6px;
-  margin-bottom:10px;
+
+// =====================================================
+//  IA
+// =====================================================
+function aiTurn(){
+  const pl=G.joueurs[G.cur];
+  if(!pl||!pl.isAI)return;
+  if(pl.hand.length===0){nextTurn();return;}
+
+  let best=null,bestPts=-1;
+
+  for(let hi=0;hi<pl.hand.length;hi++){
+    const tok=pl.hand[hi];
+    for(let r=0;r<15;r++){
+      for(let c=0;c<15;c++){
+        if(G.board[r][c])continue;
+        if(G.first&&!(r===7&&c===7))continue;
+        if(!G.first&&!adjFixed(r,c))continue;
+
+        const jokerVals=tok.isJoker
+          ?[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
+          :[null];
+
+        for(const jv of jokerVals){
+          G.pend=[{
+            hi,r,c,
+            val:tok.val,isJoker:tok.isJoker,
+            jokerVal:tok.isJoker?jv:null
+          }];
+          if(validate().ok){
+            const pts=calcPoints();
+            if(pts>bestPts){
+              bestPts=pts;
+              best={hi,r,c,val:tok.val,isJoker:tok.isJoker,
+                    jokerVal:tok.isJoker?jv:null};
+            }
+          }
+          G.pend=[];
+        }
+      }
+    }
+  }
+
+  if(best){
+    G.pend=[{...best}];
+    const pts=calcPoints();
+    pl.score+=pts;
+
+    // Score IA toujours affiché
+    addLog(`🤖 ${pl.name} → ${String.fromCharCode(65+best.r)}${best.c+1} +${pts} pts → Total ${pl.score}`,'score');
+
+    G.board[best.r][best.c]={val:best.val,isJoker:best.isJoker,jokerVal:best.jokerVal};
+    pl.hand.splice(best.hi,1);
+    pl.hand.push(...drawN(G.sac,1));
+
+    const rejouer=G.rejouer;
+    G.pend=[];G.first=false;G.rejouer=false;
+
+    if(checkEnd())return;
+    if(rejouer){render();setTimeout(aiTurn,800);}
+    else nextTurn();
+
+  }else{
+    if(G.sac.length>=5&&pl.hand.length>0){
+      const idx=Math.floor(Math.random()*pl.hand.length);
+      const t=pl.hand.splice(idx,1);
+      G.sac.push(...t);shuffle(G.sac);
+      pl.hand.push(...drawN(G.sac,1));
+      addLog(`🤖 ${pl.name} échange`,'i');
+    }else{
+      addLog(`🤖 ${pl.name} passe`,'i');
+    }
+    nextTurn();
+  }
 }
-.srow{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  padding:7px 0;
-  border-bottom:1px solid #334155;
-  font-size:.9rem;
+
+// =====================================================
+//  RENDU
+// =====================================================
+function render(){
+  renderBoard();
+  renderHand();
+  renderScores();
+  document.getElementById('sac-ct').textContent=G.sac.length;
+  const pl=G.joueurs[G.cur];
+  document.getElementById('turn-name').textContent=
+    (pl.isAI?'🤖 ':'')+pl.name;
 }
-.srow:last-child{border-bottom:none;}
-.srow .pts{font-size:1.15rem;font-weight:800;color:#fbbf24;}
-.srow .cur{color:#22c55e;font-weight:700;}
 
-/* Journal */
-.log-head{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:8px;
+function renderBoard(){
+  const bd=document.getElementById('board');
+  bd.innerHTML='';
+
+  for(let r=0;r<15;r++){
+    for(let c=0;c<15;c++){
+      const cell=document.createElement('div');
+      cell.className='cell';
+
+      const sp=SPECS[r+','+c];
+      const used=G.usedSp.has(r+','+c);
+      if(!used&&sp)cell.classList.add('sp-'+sp);
+
+      const boardTok=G.board[r][c];
+      const pendTok=G.pend.find(p=>p.r===r&&p.c===c);
+
+      if(boardTok){
+        cell.appendChild(makeTok(boardTok,false));
+      }else if(pendTok){
+        const tk=makeTok({val:pendTok.val,isJoker:pendTok.isJoker,jokerVal:pendTok.jokerVal},true);
+        cell.appendChild(tk);
+        cell.addEventListener('click',()=>removePend(r,c));
+      }else{
+        if(!used&&sp){
+          const lbl=document.createElement('div');
+          lbl.className='cell-lbl';
+          if(sp==='R'){
+            lbl.innerHTML=
+              `<svg viewBox="0 0 24 24" fill="white" opacity="0.92">
+                <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6s-2.69
+                6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58
+                8-8-3.58-8-8-8z"/>
+              </svg>`;
+          }else{
+            const txt=document.createElement('span');
+            txt.className='cell-lbl-text';
+            txt.textContent=(sp==='D'||sp==='C')?'×2':'×3';
+            lbl.appendChild(txt);
+          }
+          cell.appendChild(lbl);
+        }
+
+        if(selIdx!==null&&!G.joueurs[G.cur].isAI){
+          if(G.first){
+            if(r===7&&c===7)cell.classList.add('placeable');
+          }else{
+            if(adjFixed(r,c))cell.classList.add('placeable');
+          }
+        }
+        cell.addEventListener('click',()=>onCellClick(r,c));
+      }
+      bd.appendChild(cell);
+    }
+  }
 }
-.log-toggle{display:flex;gap:5px;}
-.ltbtn{
-  padding:3px 10px;
-  border:none;border-radius:12px;
-  font-size:.7rem;cursor:pointer;
-  background:#334155;color:#94a3b8;font-weight:600;
-  transition:background .15s;
+
+function makeTok(t,isPend){
+  const div=document.createElement('div');
+  div.className='tok'+(t.isJoker?' joker':'')+(isPend?' pending':'');
+  if(t.isJoker){
+    div.textContent='X';
+    if(t.jokerVal!==null&&t.jokerVal!==undefined){
+      const cor=document.createElement('span');
+      cor.className='jcorner';
+      cor.textContent=t.jokerVal;
+      div.appendChild(cor);
+    }
+  }else{
+    div.textContent=t.val;
+  }
+  return div;
 }
-.ltbtn.on{background:#22c55e;color:#fff;}
-#logbox{
-  background:#0f172a;
-  border-radius:6px;
-  padding:8px;
-  max-height:200px;
-  overflow-y:auto;
-  font-size:.78rem;
-  border:1px solid #334155;
+
+function renderHand(){
+  const ct=document.getElementById('hand-tokens');
+  ct.innerHTML='';
+  const pl=G.joueurs[G.cur];
+
+  if(pl.isAI){
+    ct.innerHTML='<span style="color:#94a3b8;font-size:.85rem;display:block;text-align:center;">🤖 L\'IA réfléchit…</span>';
+    return;
+  }
+
+  const usedHi=new Set(G.pend.map(p=>p.hi));
+  const slots=Math.max(3,pl.hand.length);
+  for(let i=0;i<slots;i++){
+    const div=document.createElement('div');
+    if(i>=pl.hand.length||usedHi.has(i)){
+      div.className='htok ghost';
+    }else{
+      const t=pl.hand[i];
+      div.className='htok'+(t.isJoker?' joker':'')+(selIdx===i?' sel':'');
+      div.textContent=t.isJoker?'X':t.val;
+      div.addEventListener('click',()=>selectTok(i));
+    }
+    ct.appendChild(div);
+  }
 }
-#logbox p{margin-bottom:4px;line-height:1.4;}
-.lg{color:#4ade80;}
-.lb{color:#f87171;}
-.li{color:#93c5fd;}
-.lp{color:#fbbf24;font-weight:700;}
 
-/* ===== MODALS ===== */
-.overlay{
-  display:none;
-  position:fixed;inset:0;
-  background:rgba(0,0,0,.78);
-  backdrop-filter:blur(3px);
-  z-index:200;
-  align-items:center;
-  justify-content:center;
-  padding:16px;
+function renderScores(){
+  document.getElementById('scores-list').innerHTML=
+    G.joueurs.map((j,i)=>
+      `<div class="srow">
+         <span class="${i===G.cur?'cur':''}">
+           ${j.isAI?'🤖':'👤'} ${j.name} ${i===G.cur?'◀':''}
+         </span>
+         <span class="pts">${j.score}</span>
+       </div>`
+    ).join('');
 }
-.overlay.on{display:flex;}
-.modal{
-  background:#1e293b;
-  border-radius:14px;
-  padding:22px;
-  width:100%;max-width:340px;
-  border:1px solid #475569;
-  box-shadow:0 25px 50px rgba(0,0,0,.6);
+
+// =====================================================
+//  INTERACTIONS
+// =====================================================
+function selectTok(i){
+  if(G.over)return;
+  if(G.joueurs[G.cur].isAI)return;
+  if(G.pend.some(p=>p.hi===i))return;
+  selIdx=(selIdx===i)?null:i;
+  render();
 }
-.modal h2{color:#fbbf24;text-align:center;margin-bottom:10px;font-size:1.15rem;}
-.modal .sub{color:#94a3b8;text-align:center;font-size:.88rem;margin-bottom:14px;}
-.jgrid{
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:7px;margin-bottom:14px;
+
+function onCellClick(r,c){
+  if(G.over)return;
+  if(G.joueurs[G.cur].isAI)return;
+  if(selIdx===null){addLog('Sélectionnez d\'abord un jeton','b');return;}
+  if(G.board[r][c])return;
+  if(G.pend.some(p=>p.r===r&&p.c===c))return;
+
+  const pl=G.joueurs[G.cur];
+  const tok=pl.hand[selIdx];
+
+  if(tok.isJoker){
+    const cap=selIdx;
+    openJoker(jv=>{
+      G.pend.push({hi:cap,r,c,val:null,isJoker:true,jokerVal:jv});
+      selIdx=null;render();
+    });
+  }else{
+    G.pend.push({hi:selIdx,r,c,val:tok.val,isJoker:false,jokerVal:null});
+    selIdx=null;render();
+  }
 }
-.jval{
-  padding:11px 4px;
-  background:#334155;border-radius:7px;
-  text-align:center;cursor:pointer;
-  font-weight:700;font-size:.95rem;
-  transition:background .15s,transform .1s;
-  -webkit-tap-highlight-color:transparent;
+
+function removePend(r,c){
+  const i=G.pend.findIndex(p=>p.r===r&&p.c===c);
+  if(i>-1){G.pend.splice(i,1);selIdx=null;render();}
 }
-.jval:hover,.jval:active{background:#f59e0b;color:#1a1a1a;transform:scale(1.08);}
-.finrow{
-  display:flex;justify-content:space-between;
-  padding:8px 0;border-bottom:1px solid #334155;font-size:.95rem;
+
+// ── Joker ──
+function openJoker(cb){
+  jokerCB=cb;
+  const grid=document.getElementById('jgrid');
+  grid.innerHTML='';
+  for(let v=0;v<=15;v++){
+    const d=document.createElement('div');
+    d.className='jval';d.textContent=v;
+    d.addEventListener('click',()=>{
+      document.getElementById('modal-joker').classList.remove('on');
+      jokerCB=null;cb(v);
+    });
+    grid.appendChild(d);
+  }
+  document.getElementById('modal-joker').classList.add('on');
 }
-.finrow:last-child{border-bottom:none;}
-.finpts{font-weight:800;color:#fbbf24;}
 
-/* ===== RESPONSIVE ===== */
-:root{
-  --cs:38px;
-  --lbl:22px;
-  --csf:.68rem;
+// ── Échange ──
+function openEch(){
+  if(G.joueurs[G.cur].isAI)return;
+  if(G.pend.length>0){addLog('Annulez vos placements avant d\'échanger','b');return;}
+  if(G.sac.length<5){addLog('Il faut ≥5 jetons dans le sac pour échanger','b');return;}
+
+  echSel=[];
+  const pl=G.joueurs[G.cur];
+  const ct=document.getElementById('ech-toks');
+  ct.innerHTML='';
+
+  pl.hand.forEach((t,i)=>{
+    const d=document.createElement('div');
+    d.className='htok'+(t.isJoker?' joker':'');
+    d.textContent=t.isJoker?'X':t.val;
+    d.style.cursor='pointer';
+    d.addEventListener('click',()=>{
+      const idx=echSel.indexOf(i);
+      if(idx>-1){echSel.splice(idx,1);d.classList.remove('sel');}
+      else if(echSel.length<3){echSel.push(i);d.classList.add('sel');}
+    });
+    ct.appendChild(d);
+  });
+  document.getElementById('modal-ech').classList.add('on');
 }
-@media(max-width:1100px){
-  :root{--cs:34px;--lbl:20px;--csf:.62rem;}
+
+function confirmEch(){
+  if(echSel.length===0){addLog('Sélectionnez au moins 1 jeton','b');return;}
+  const pl=G.joueurs[G.cur];
+  const sorted=[...echSel].sort((a,b)=>b-a);
+  const removed=sorted.map(i=>pl.hand.splice(i,1)[0]);
+  G.sac.push(...removed);shuffle(G.sac);
+  pl.hand.push(...drawN(G.sac,removed.length));
+  addLog(`🔄 Échange de ${removed.length} jeton(s)`,'i');
+  document.getElementById('modal-ech').classList.remove('on');
+  echSel=[];
+  nextTurn();
 }
-@media(max-width:900px){
-  :root{--cs:30px;--lbl:18px;--csf:.58rem;}
-  .side-panel{width:100%;max-width:620px;}
-  .game-wrap{flex-direction:column;align-items:center;}
+
+// ── Journal ──
+// Types : 'score' = toujours affiché | 'g','b','i','p' = détail seulement
+function addLog(msg,type){
+  // Mode minimum : on affiche UNIQUEMENT les scores (type 'score') et erreurs
+  if(logMode==='min'&&type!=='score'&&type!=='b')return;
+
+  const box=document.getElementById('logbox');
+  const p=document.createElement('p');
+  p.textContent=msg;
+  // 'score' = couleur verte comme 'g'
+  p.className={
+    score:'lg',
+    g:'lg',
+    b:'lb',
+    i:'li',
+    p:'lp'
+  }[type]||'';
+  box.prepend(p);
+  while(box.children.length>40)box.removeChild(box.lastChild);
 }
-@media(max-width:680px){
-  :root{--cs:26px;--lbl:16px;--csf:.52rem;}
-  .htok{width:46px;height:46px;font-size:1.05rem;}
-  .vbtn{width:32px;font-size:.52rem;}
+
+function setLog(mode){
+  logMode=mode;
+  document.getElementById('btn-ld').classList.toggle('on',mode==='detail');
+  document.getElementById('btn-lm').classList.toggle('on',mode==='min');
 }
-@media(max-width:520px){
-  :root{--cs:22px;--lbl:14px;--csf:.46rem;}
-  .htok{width:42px;height:42px;font-size:.95rem;}
-  .vbtn{width:28px;font-size:.48rem;padding:10px 0;}
-}
-@media(max-width:420px){
-  :root{--cs:19px;--lbl:13px;--csf:.42rem;}
-  .htok{width:38px;height:38px;font-size:.88rem;}
-  .vbtn{width:26px;font-size:.44rem;padding:8px 0;}
-}
-</style>
-</head>
-<body>
 
-<header>
-  <div class="logo"></div>
-  <h1>Triolet Online</h1>
-</header>
+// =====================================================
+//  INIT
+// =====================================================
+document.addEventListener('DOMContentLoaded',()=>{
 
-<!-- ========== LOBBY ========== -->
-<div id="screen-lobby">
-  <div class="card">
-    <div class="card-title">👤 Votre profil</div>
-    <input id="inp-pseudo" class="field" type="text"
-           placeholder="Votre pseudo..." maxlength="15" value="Joueur"/>
-  </div>
-  <div class="card">
-    <div class="card-title">🎮 Mode de jeu</div>
-    <select id="inp-mode" class="field">
-      <option value="solo">Solo vs IA</option>
-      <option value="local">2 Joueurs (même écran)</option>
-    </select>
-    <button id="btn-jouer" class="btn btn-green" style="margin-top:4px;">
-      ▶ &nbsp;JOUER
-    </button>
-  </div>
-</div>
+  function buildCoords(){
+    const cc=document.getElementById('cc');
+    const cr=document.getElementById('cr');
+    if(cc.children.length)return;
+    for(let i=1;i<=15;i++){
+      const s=document.createElement('span');
+      s.textContent=i;cc.appendChild(s);
+    }
+    for(let i=0;i<15;i++){
+      const s=document.createElement('span');
+      s.textContent=String.fromCharCode(65+i);cr.appendChild(s);
+    }
+  }
 
-<!-- ========== JEU ========== -->
-<div id="screen-game">
-  <div class="game-wrap">
+  document.getElementById('btn-jouer').addEventListener('click',()=>{
+    const pseudo=document.getElementById('inp-pseudo').value.trim()||'Joueur';
+    const mode=document.getElementById('inp-mode').value;
+    const players=mode==='solo'?[pseudo,'IA']:[pseudo,'Joueur 2'];
+    G=newGame(players);
+    document.getElementById('screen-lobby').style.display='none';
+    document.getElementById('screen-game').style.display='block';
+    buildCoords();
+    addLog('🎮 '+players.join(' vs ')+' — Bonne partie !','g');
+    addLog('📦 '+G.sac.length+' jetons dans le sac','i');
+    render();
+  });
 
-    <!-- Gauche : plateau + chevalet encadré -->
-    <div class="board-zone">
+  document.getElementById('btn-valider').addEventListener('click',()=>{
+    if(!G||G.over)return;
+    if(G.joueurs[G.cur].isAI){addLog('Ce n\'est pas votre tour','b');return;}
+    playMove();
+  });
 
-      <!-- Plateau -->
-      <div class="board-shell">
-        <div class="board-grid-wrap">
-          <div class="coord-corner"></div>
-          <div class="coord-cols" id="cc"></div>
-          <div class="coord-rows" id="cr"></div>
-          <div id="board"></div>
-        </div>
-      </div>
+  document.getElementById('btn-annuler').addEventListener('click',()=>{
+    if(!G)return;
+    G.pend=[];selIdx=null;render();
+  });
 
-      <!--
-        CHEVALET ENCADRÉ PAR LES BOUTONS VERTICAUX
-        [Valider  ]  [  chevalet  ]  [Annuler]
-        [Echanger ]  [  chevalet  ]  [Quitter]
-      -->
-      <div class="hand-action-row">
+  document.getElementById('btn-echanger').addEventListener('click',()=>{
+    if(!G||G.over)return;
+    openEch();
+  });
 
-        <!-- Boutons GAUCHE -->
-        <div class="vbtns">
-          <button id="btn-valider"  class="vbtn vbtn-green">✅ Valider</button>
-          <button id="btn-echanger" class="vbtn vbtn-blue" >🔄 Échange</button>
-        </div>
+  document.getElementById('btn-quitter').addEventListener('click',()=>{
+    location.reload();
+  });
 
-        <!-- Chevalet CENTRE -->
-        <div class="hand-zone">
-          <div class="hand-info">
-            <span>🎴 <strong id="turn-name">-</strong></span>
-            <span>🎒 Sac : <strong id="sac-ct">80</strong></span>
-          </div>
-          <div id="hand-tokens" class="hand-tokens"></div>
-        </div>
+  document.getElementById('btn-joker-cancel').addEventListener('click',()=>{
+    document.getElementById('modal-joker').classList.remove('on');
+    jokerCB=null;selIdx=null;
+    if(G)render();
+  });
 
-        <!-- Boutons DROITE -->
-        <div class="vbtns">
-          <button id="btn-annuler" class="vbtn vbtn-gray">↩ Annuler</button>
-          <button id="btn-quitter" class="vbtn vbtn-red" >🚪 Quitter</button>
-        </div>
+  document.getElementById('btn-ech-ok').addEventListener('click',confirmEch);
+  document.getElementById('btn-ech-no').addEventListener('click',()=>{
+    document.getElementById('modal-ech').classList.remove('on');
+    echSel=[];
+  });
 
-      </div>
-    </div><!-- fin board-zone -->
+  document.getElementById('btn-rejouer').addEventListener('click',()=>{
+    location.reload();
+  });
 
-    <!-- Droite : scores + journal -->
-    <div class="side-panel">
-
-      <div class="pcard">
-        <div class="ptitle">🏆 Scores</div>
-        <div id="scores-list"></div>
-      </div>
-
-      <div class="pcard">
-        <div class="log-head">
-          <div class="ptitle" style="margin:0;">📋 Journal</div>
-          <div class="log-toggle">
-            <button class="ltbtn on" id="btn-ld">Détaillé</button>
-            <button class="ltbtn"    id="btn-lm">Minimum</button>
-          </div>
-        </div>
-        <div id="logbox"></div>
-      </div>
-
-    </div>
-  </div>
-</div>
-
-<!-- MODAL JOKER -->
-<div class="overlay" id="modal-joker">
-  <div class="modal">
-    <h2>🃏 Valeur du Joker</h2>
-    <p class="sub">Quelle valeur (0-15) ce joker représente-t-il ?</p>
-    <div class="jgrid" id="jgrid"></div>
-    <button id="btn-joker-cancel" class="btn btn-gray">Annuler</button>
-  </div>
-</div>
-
-<!-- MODAL ÉCHANGE -->
-<div class="overlay" id="modal-ech">
-  <div class="modal">
-    <h2>🔄 Échanger</h2>
-    <p class="sub">Sélectionnez 1 à 3 jetons à remettre dans le sac</p>
-    <div id="ech-toks"
-         style="display:flex;gap:8px;justify-content:center;
-                margin:12px 0;flex-wrap:wrap;min-height:56px;"></div>
-    <button id="btn-ech-ok" class="btn btn-green" style="margin-bottom:8px;">Confirmer</button>
-    <button id="btn-ech-no" class="btn btn-gray">Annuler</button>
-  </div>
-</div>
-
-<!-- MODAL FIN -->
-<div class="overlay" id="modal-fin">
-  <div class="modal">
-    <h2>🎉 Fin de partie !</h2>
-    <div id="fin-scores" style="margin:16px 0;"></div>
-    <button id="btn-rejouer" class="btn btn-green">Nouvelle partie</button>
-  </div>
-</div>
-
-<script src="index.js"></script>
-</body>
-</html>
+  document.getElementById('btn-ld').addEventListener('click',()=>setLog('detail'));
+  document.getElementById('btn-lm').addEventListener('click',()=>setLog('min'));
+});
+      
