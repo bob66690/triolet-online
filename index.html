@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎲 Triolet Online</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;900&display=swap');
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: #0f0e17;
+      color: #fffffe;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    h1 {
+      font-family: 'Fredoka One', cursive;
+      font-size: clamp(2rem, 8vw, 3.5rem);
+      text-align: center;
+      background: linear-gradient(135deg, #ffd166, #f4a261, #e63946);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 20px;
+    }
+    
+    .box {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    
+    h2 {
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.3rem;
+      color: #ffd166;
+      margin-bottom: 12px;
+    }
+    
+    input {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      background: rgba(255,255,255,0.07);
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      color: #fffffe;
+      font-family: 'Nunito', sans-serif;
+      font-size: 1rem;
+    }
+    
+    input:focus {
+      outline: none;
+      border-color: #f4a261;
+    }
+    
+    input::placeholder { color: rgba(255,255,255,0.4); }
+    
+    button {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      border: none;
+      border-radius: 50px;
+      font-family: 'Nunito', sans-serif;
+      font-weight: 900;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    button:hover { transform: translateY(-2px); }
+    button:active { transform: scale(0.97); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    
+    .btn-red {
+      background: linear-gradient(135deg, #f4a261, #e63946);
+      color: #fff;
+      box-shadow: 0 6px 20px rgba(230,57,70,0.3);
+    }
+    
+    .btn-green {
+      background: linear-gradient(135deg, #06d6a0, #118ab2);
+      color: #fff;
+      box-shadow: 0 6px 20px rgba(6,214,160,0.3);
+    }
+    
+    .btn-ghost {
+      background: transparent;
+      border: 2px solid rgba(255,255,255,0.2);
+      color: rgba(255,255,255,0.7);
+    }
+    
+    .btn-sm {
+      padding: 8px 16px;
+      font-size: 0.85rem;
+      width: auto;
+    }
+    
+    .emoji {
+      font-size: 3rem;
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.3s;
+      display: inline-block;
+    }
+    
+    .emoji:hover { transform: scale(1.2) rotate(10deg); }
+    
+    .room {
+      background: rgba(255,255,255,0.05);
+      padding: 12px;
+      border-radius: 12px;
+      margin: 8px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .player {
+      background: rgba(255,255,255,0.05);
+      padding: 10px;
+      border-radius: 10px;
+      margin: 6px 0;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    .crown {
+      color: #ffd166;
+      margin-left: auto;
+    }
+    
+    .chat {
+      max-height: 200px;
+      overflow-y: auto;
+      background: rgba(0,0,0,0.3);
+      padding: 10px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+    }
+    
+    .msg {
+      margin: 5px 0;
+      padding: 6px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 6px;
+    }
+    
+    .hide { display: none; }
+    
+    /* === PLATEAU DE JEU === */
+    
+    .board-wrap {
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
+      margin-bottom: 10px;
+    }
+    
+    .board {
+      display: grid;
+      grid-template-columns: repeat(15, 1fr);
+      gap: 2px;
+      background: #1a3a6e;
+      border-radius: 8px;
+      padding: 4px;
+      min-width: 450px;
+    }
+    
+    .cell {
+      aspect-ratio: 1;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 900;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.2s;
+    }
+    
+    .cn { background: #1e4fa0; }
+    .cx2 { background: #7ec8e3; border: 1px solid #4aafc9; }
+    .cx3 { background: #2e7d32; border: 1px solid #1b5e20; }
+    .cr { background: #5c1a8a; border: 2px solid #9c4dcc; }
+    .cs { background: #f57c00; border: 2px solid #ffb300; }
+    
+    .cell:hover:not(.occ) { filter: brightness(1.4); }
+    
+    .cnew {
+      background: rgba(255,235,59,0.9) !important;
+      border: 2px solid #f9a825 !important;
+      animation: pop 0.3s ease;
+    }
+    
+    @keyframes pop {
+      0% { transform: scale(0.4); }
+      60% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+    
+    .tok {
+      font-size: 0.75rem;
+      font-weight: 900;
+      color: #fff;
+      line-height: 1;
+    }
+    
+    .tok-y { color: #1a1a1a; }
+    
+    .cell-lbl {
+      font-size: 0.36rem;
+      color: rgba(255,255,255,0.75);
+      position: absolute;
+      bottom: 1px;
+      right: 2px;
+    }
+    
+    .scores-bar {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      margin-bottom: 10px;
+    }
+    
+    .sc {
+      flex-shrink: 0;
+      border-radius: 30px;
+      padding: 8px 12px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      border: 2px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.05);
+    }
+    
+    .sc.act {
+      border-color: #ffd166;
+      background: rgba(255,209,102,0.1);
+    }
+    
+    .scn {
+      font-size: 0.65rem;
+      color: rgba(255,255,255,0.4);
+      display: block;
+      white-space: nowrap;
+    }
+    
+    .scp {
+      display: block;
+      font-size: 0.95rem;
+    }
+    
+    .hand {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin: 10px 0;
+    }
+    
+    .tok-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.25rem;
+      cursor: pointer;
+      transition: all 0.18s;
+      border: 2px solid transparent;
+      background: rgba(255,255,255,0.1);
+      color: #fffffe;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+    }
+    
+    .tok-btn:hover {
+      transform: translateY(-4px);
+      border-color: rgba(255,255,255,0.35);
+    }
+    
+    .tok-btn.sel {
+      background: #ffd166;
+      color: #0f0e17;
+      border-color: #f4a261;
+      transform: translateY(-6px);
+    }
+    
+    .tok-btn.placed {
+      opacity: 0.3;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .alert {
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      border-left: 3px solid;
+    }
+    
+    .aw {
+      background: rgba(255,209,102,0.12);
+      border-color: #ffd166;
+      color: #ffd166;
+    }
+    
+    .ao {
+      background: rgba(6,214,160,0.12);
+      border-color: #06d6a0;
+      color: #06d6a0;
+    }
+    
+    .ae {
+      background: rgba(230,57,70,0.14);
+      border-color: #e63946;
+      color: #e63946;
+    }
+    
+    .modal-bg {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .modal {
+      background: #1a1a2e;
+      border-radius: 20px;
+      padding: 22px;
+      max-width: 420px;
+      width: 100%;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .flex {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎲 Triolet Online</h1>
+    
+    <!-- MENU PRINCIPAL -->
+    <div id="menu">
+      <div class="box">
+        <h2>👤 Votre profil</h2>
+        <input id="nom" placeholder="Votre pseudo" value="Joueur1" maxlength="15">
+        <div style="text-align:center; margin:15px 0;">
+          <span id="emoji" class="emoji">🦊</span>
+          <p style="font-size:0.9rem; opacity:0.7; margin-top:8px;">Cliquez pour changer</p>
+        </div>
+      </div>
+
+      <div class="box">
+        <h2>➕ Créer un salon</h2>
+        <input id="nomSalon" placeholder="Nom du salon" value="Ma partie" maxlength="25">
+        <button class="btn-red" onclick="creerSalon()">🚀 Créer</button>
+      </div>
+
+      <div class="box">
+        <h2>🚪 Salons disponibles</h2>
+        <div id="listeSalons">Chargement...</div>
+      </div>
+    </div>
+
+    <!-- SALON -->
+    <div id="salon" class="hide">
+      <div id="alertBox"></div>
+      
+      <div class="box">
+        <h2>🏠 <span id="titreSalon"></span></h2>
+        <div id="listeJoueurs"></div>
+      </div>
+
+      <div class="box">
+        <h2>💬 Chat</h2>
+        <div class="chat" id="chat"></div>
+        <input id="msgChat" placeholder="Message..." maxlength="100">
+        <button class="btn-green btn-sm" onclick="envoyerMsg()">Envoyer</button>
+      </div>
+
+      <button id="btnStart" class="btn-red" onclick="lancerPartie()">🎮 Lancer la partie</button>
+      <button class="btn-ghost" onclick="quitter()">Quitter</button>
+    </div>
+
+    <!-- PARTIE (JEU COMPLET) -->
+    <div id="partie" class="hide">
+      <div class="scores-bar" id="scoresBar"></div>
+      
+      <div class="box">
+        <div id="turnInfo" style="text-align:center; margin-bottom:10px; font-weight:700;"></div>
+        <div id="gameAlert"></div>
+        
+        <div class="board-wrap">
+          <div class="board" id="board"></div>
+        </div>
+        
+        <div style="font-size:0.7rem; opacity:0.6; margin-top:8px;">
+          <strong>Légende:</strong> 
+          <span style="color:#7ec8e3;">█ x2</span> | 
+          <span style="color:#2e7d32;">█ x3</span> | 
+          <span style="color:#5c1a8a;">█ Rejouer</span> | 
+          <span style="color:#f57c00;">█ Centre</span>
+        </div>
+      </div>
+      
+      <div class="box" id="handBox">
+        <h2>Votre chevalet</h2>
+        <div class="hand" id="hand"></div>
+        <div class="flex" style="flex-wrap:wrap; gap:8px;">
+          <button class="btn-green btn-sm" id="validateBtn" onclick="validerCoup()">Valider</button>
+          <button class="btn-ghost btn-sm" onclick="annulerCoup()">Annuler</button>
+          <button class="btn-ghost btn-sm" onclick="passerTour()">Passer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Joker -->
+  <div id="jokerModal" class="modal-bg hide">
+    <div class="modal">
+      <h2>Valeur du Joker X</h2>
+      <p style="font-size:0.85rem; opacity:0.7; margin-bottom:10px;">
+        Quelle valeur (0-15) remplace ce joker ?
+      </p>
+      <input type="number" id="jokerVal" min="0" max="15" value="7" style="width:100px; text-align:center;">
+      <button class="btn-green" onclick="confirmerJoker()">Confirmer</button>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+    const emojis = ['🦊','🐼','🦁','🦋','🐸','🐯','🐨','🐵','🐶','🐱','🐭','🐹','🐰','🦄'];
+    let emojiActuel = 0;
+    let monSalon = null;
+    let isJoining = false;
+    
+    // État du jeu
+    let gameState = null;
+    let myPlayerId = null;
+    let selectedToken = null;
+    let placements = [];
+    let jokerPendingCell = null;
+
+    // Changer emoji
+    document.getElementById('emoji').onclick = () => {
+      emojiActuel = (emojiActuel + 1) % emojis.length;
+      document.getElementById('emoji').textContent = emojis[emojiActuel];
+    };
+
+    // ========== SOCKET EVENTS ==========
+    
+    socket.on('roomList', (salons) => {
+      const liste = document.getElementById('listeSalons');
+      if (!salons || salons.length === 0) {
+        liste.innerHTML = '<p style="opacity:0.6;">Aucun salon</p>';
+      } else {
+        liste.innerHTML = salons.map(s => `
+          <div class="room">
+            <div>
+              <strong>${s.name}</strong>
+              <small style="opacity:0.7;"> (${s.players}/4)</small>
+            </div>
+            ${s.status === 'waiting' ? `<button class="btn-green btn-sm" onclick="rejoindre('${s.id}')">Rejoindre</button>` : '<button class="btn-sm" disabled>En jeu</button>'}
+          </div>
+        `).join('');
+      }
+    });
+
+    socket.on('joined', (salon) => {
+      isJoining = false;
+      monSalon = salon;
+      myPlayerId = socket.id;
+      afficherSalon(salon);
+    });
+
+    socket.on('updateRoom', (salon) => {
+      monSalon = salon;
+      majJoueurs(salon);
+    });
+
+    socket.on('chatMsg', ({ name, text, time }) => {
+      const chat = document.getElementById('chat');
+      chat.innerHTML += `<div class="msg"><strong>${name}:</strong> ${text}</div>`;
+      chat.scrollTop = chat.scrollHeight;
+    });
+
+    socket.on('gameStarted', ({ message, players }) => {
+      showAlert(message, 'success');
+      
+      // Initialiser le jeu
+      setTimeout(() => {
+        gameState = initGame(players);
+        afficherPartie();
+        renderGame();
+      }, 1000);
+    });
+
+    socket.on('gameUpdate', (newState) => {
+      gameState = newState;
+      renderGame();
+    });
+
+    socket.on('error', (msg) => {
+      showAlert('⚠️ ' + msg, 'alert');
+      isJoining = false;
+    });
+
+    // ========== FONCTIONS SALON ==========
+    
+    function creerSalon() {
+      const nomSalon = document.getElementById('nomSalon').value.trim() || 'Partie';
+      const nom = document.getElementById('nom').value.trim() || 'Joueur';
+      socket.emit('createRoom', {
+        name: nomSalon,
+        player: { name: nom, emoji: emojis[emojiActuel] }
+      });
+    }
+
+    function rejoindre(id) {
+      if (isJoining) return;
+      isJoining = true;
+      const nom = document.getElementById('nom').value.trim() || 'Joueur';
+      socket.emit('joinRoom', {
+        roomId: id,
+        player: { name: nom, emoji: emojis[emojiActuel] }
+      });
+      setTimeout(() => { isJoining = false; }, 2000);
+    }
+
+    function afficherSalon(salon) {
+      document.getElementById('menu').classList.add('hide');
+      document.getElementById('salon').classList.remove('hide');
+      document.getElementById('titreSalon').textContent = salon.name;
+      document.getElementById('chat').innerHTML = '';
+      majJoueurs(salon);
+    }
+
+    function majJoueurs(salon) {
+      document.getElementById('listeJoueurs').innerHTML = salon.players.map(p => `
+        <div class="player">
+          <span style="font-size:1.8rem;">${p.emoji}</span>
+          <strong style="flex:1;">${p.name}</strong>
+          ${p.id === salon.host ? '<span class="crown">👑</span>' : ''}
+        </div>
+      `).join('');
+      
+      const btnStart = document.getElementById('btnStart');
+      btnStart.style.display = (salon.host === socket.id) ? 'block' : 'none';
+    }
+
+    function envoyerMsg() {
+      const input = document.getElementById('msgChat');
+      const texte = input.value.trim();
+      if (texte && monSalon) {
+        socket.emit('chat', {
+          roomId: monSalon.id,
+          name: document.getElementById('nom').value.trim() || 'Joueur',
+          text: texte
+        });
+        input.value = '';
+      }
+    }
+
+    function lancerPartie() {
+      if (!monSalon) return;
+      socket.emit('startGame', { roomId: monSalon.id });
+    }
+
+    function quitter() {
+      monSalon = null;
+      isJoining = false;
+      document.getElementById('menu').classList.remove('hide');
+      document.getElementById('salon').classList.add('hide');
+      socket.emit('getRooms');
+    }
+
+    function showAlert(msg, type) {
+      const box = document.getElementById('alertBox');
+      box.innerHTML = `<div class="alert ${type === 'success' ? 'ao' : type === 'alert' ? 'ae' : 'aw'}">${msg}</div>`;
+      setTimeout(() => { box.innerHTML = ''; }, 4000);
+    }
+
+    // ========== JEU TRIOLET ==========
+    
+    function initGame(players) {
+      const PLAYER_COLORS = ["#e63946","#06d6a0","#ffd166","#118ab2"];
+      
+      const bag = buildBag();
+      bag.splice(0, 3); // 3 jetons cachés
+      
+      const gamePlayers = players.map((p, i) => ({
+        ...p,
+        color: PLAYER_COLORS[i],
+        hand: [bag.shift(), bag.shift(), bag.shift()],
+        score: 0
+      }));
+
+      // Tirage au sort du premier joueur
+      const drawn = gamePlayers.map(() => bag.shift());
+      const vals = drawn.map(t => t.isJoker ? 0 : t.val);
+      const maxVal = Math.max(...vals);
+      const winners = vals.reduce((acc, v, i) => v === maxVal ? [...acc, i] : acc, []);
+      const first = winners[Math.floor(Math.random() * winners.length)];
+
+      gamePlayers.forEach((p, i) => {
+        p.hand[0] = drawn[i];
+      });
+
+      return {
+        players: gamePlayers,
+        bag,
+        grid: Array.from({ length: 15 }, () => Array(15).fill(null)),
+        currentPlayer: first,
+        turnCount: 0,
+        specialUsedGame: new Set(),
+        gameOver: false
+      };
+    }
+
+    function buildBag() {
+      const counts = [9,9,8,8,7,8,6,6,4,4,3,3,2,2,1,1];
+      const bag = [];
+      counts.forEach((cnt, val) => {
+        for (let i = 0; i < cnt; i++) {
+          bag.push({ val, id: `${val}-${i}`, isJoker: false });
+        }
+      });
+      bag.push({ val: null, id: 'joker-0', isJoker: true });
+      bag.push({ val: null, id: 'joker-1', isJoker: true });
+      return shuffle(bag);
+    }
+
+    function shuffle(arr) {
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    const BOARD_SPECIAL = buildBoard();
+    
+    function buildBoard() {
+      const b = Array.from({ length: 15 }, () => Array(15).fill(0));
+      b[7][7] = "S"; // Centre
+      // Rejouer
+      [[0,7],[1,1],[1,13],[7,0],[7,14],[13,1],[13,13],[14,7]].forEach(([r,c]) => b[r][c] = "R");
+      // x2
+      [[3,7],[4,4],[4,10],[7,3],[7,11],[10,4],[10,10],[11,7]].forEach(([r,c]) => b[r][c] = 2);
+      // x3
+      [[1,4],[1,10],[4,1],[4,13],[10,1],[10,13],[13,4],[13,10]].forEach(([r,c]) => b[r][c] = 3);
+      return b;
+    }
+
+    function afficherPartie() {
+      document.getElementById('menu').classList.add('hide');
+      document.getElementById('salon').classList.add('hide');
+      document.getElementById('partie').classList.remove('hide');
+    }
+
+    function renderGame() {
+      if (!gameState) return;
+      
+      const currentPlayer = gameState.players[gameState.currentPlayer];
+      const isMyTurn = currentPlayer.id === myPlayerId;
+      
+      // Scores
+      document.getElementById('scoresBar').innerHTML = gameState.players.map((p, i) => `
+        <div class="sc ${i === gameState.currentPlayer ? 'act' : ''}" style="border-color:${p.color};">
+          <span class="scn">${p.emoji} ${p.name}</span>
+          <span class="scp">${p.score} pts</span>
+        </div>
+      `).join('');
+      
+      // Info tour
+      document.getElementById('turnInfo').innerHTML = isMyTurn 
+        ? `<span style="color:${currentPlayer.color};">C'est votre tour !</span>`
+        : `<span style="color:${currentPlayer.color};">Tour de ${currentPlayer.name}...</span>`;
+      
+      // Plateau
+      renderBoard();
+      
+      // Main (seulement si c'est mon tour)
+      if (isMyTurn) {
+        renderHand();
+        document.getElementById('handBox').classList.remove('hide');
+      } else {
+        document.getElementById('handBox').classList.add('hide');
+      }
+    }
+
+    function renderBoard() {
+      const board = document.getElementById('board');
+      board.innerHTML = '';
+      
+      for (let r = 0; r < 15; r++) {
+        for (let c = 0; c < 15; c++) {
+          const sp = BOARD_SPECIAL[r][c];
+          const tok = gameState.grid[r][c];
+          const placed = placements.find(p => p.r === r && p.c === c);
+          
+          let cls = 'cell ';
+          if (tok || placed) cls += 'occ ';
+          if (placed) cls += 'cnew ';
+          else if (sp === "S") cls += 'cs ';
+          else if (sp === 2) cls += 'cx2 ';
+          else if (sp === 3) cls += 'cx3 ';
+          else if (sp === "R") cls += 'cr ';
+          else cls += 'cn ';
+          
+          const display = placed ? placed.token : tok;
+          const lbl = !display ? (sp==="S"?"C":sp===2?"x2":sp===3?"x3":sp==="R"?"R":"") : "";
+          
+          const cell = document.createElement('div');
+          cell.className = cls;
+          cell.onclick = () => placeToken(r, c);
+          
+          if (display) {
+            cell.innerHTML = `<span class="tok ${placed?'tok-y':''}">${display.isJoker ? 'X' : display.val}</span>`;
+          } else if (lbl) {
+            cell.innerHTML = `<span class="cell-lbl">${lbl}</span>`;
+          }
+          
+          board.appendChild(cell);
+        }
+      }
+    }
+
+    function renderHand() {
+      const hand = document.getElementById('hand');
+      const currentPlayer = gameState.players[gameState.currentPlayer];
+      
+      hand.innerHTML = currentPlayer.hand.map((tok, i) => {
+        if (!tok) return '<div style="width:48px;"></div>';
+        
+        const isPlaced = placements.some(p => p.handIdx === i);
+        const isSel = selectedToken === i;
+        
+        return `
+          <div class="tok-btn ${isSel?'sel':''} ${isPlaced?'placed':''}" 
+               onclick="selectToken(${i})">
+            ${tok.isJoker ? 'X' : tok.val}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selectToken(idx) {
+      const currentPlayer = gameState.players[gameState.currentPlayer];
+      if (currentPlayer.id !== myPlayerId) return;
+      if (placements.some(p => p.handIdx === idx)) return;
+      if (!currentPlayer.hand[idx]) return;
+      
+      selectedToken = selectedToken === idx ? null : idx;
+      renderHand();
+    }
+
+    function placeToken(r, c) {
+      const currentPlayer = gameState.players[gameState.currentPlayer];
+      if (currentPlayer.id !== myPlayerId) return;
+      if (selectedToken === null) {
+        showGameAlert('Sélectionnez un jeton d\'abord !', 'aw');
+        return;
+      }
+      if (gameState.grid[r][c]) return;
+      
+      // Retirer si déjà placé
+      if (placements.some(p => p.r === r && p.c === c)) {
+        placements = placements.filter(p => !(p.r === r && p.c === c));
+        renderBoard();
+        return;
+      }
+      
+      const tok = currentPlayer.hand[selectedToken];
+      
+      // Centre obligatoire au premier tour
+      if (gameState.turnCount === 0 && placements.length === 0 && (r !== 7 || c !== 7)) {
+        showGameAlert('Le premier jeton doit être placé au centre (H8) !', 'ae');
+        return;
+      }
+      
+      // Joker = demander valeur
+      if (tok.isJoker) {
+        jokerPendingCell = { r, c };
+        document.getElementById('jokerModal').classList.remove('hide');
+        return;
+      }
+      
+      placements.push({ r, c, token: tok, handIdx: selectedToken });
+      selectedToken = null;
+      renderBoard();
+      renderHand();
+    }
+
+    function confirmerJoker() {
+      const val = parseInt(document.getElementById('jokerVal').value);
+      if (val < 0 || val > 15) return;
+      
+      const currentPlayer = gameState.players[gameState.currentPlayer];
+      const tok = { ...currentPlayer.hand[selectedToken], jokerVal: val };
+      
+      placements.push({ 
+        r: jokerPendingCell.r, 
+        c: jokerPendingCell.c, 
+        token: tok, 
+        handIdx: selectedToken 
+      });
+      
+      selectedToken = null;
+      jokerPendingCell = null;
+      document.getElementById('jokerModal').classList.add('hide');
+      renderBoard();
+      renderHand();
+    }
+
+    function validerCoup() {
+      if (!placements.length) {
+        showGameAlert('Placez au moins un jeton !', 'aw');
+        return;
+      }
+      
+      // Envoyer au serveur
+      socket.emit('playTurn', {
+        roomId: monSalon.id,
+        placements
+      });
+      
+      placements = [];
+      selectedToken = null;
+    }
+
+    function annulerCoup() {
+      if (placements.length > 0) {
+        placements.pop();
+        renderBoard();
+      }
+    }
+
+    function passerTour() {
+      if (confirm('Passer votre tour ?')) {
+        socket.emit('playTurn', {
+          roomId: monSalon.id,
+          placements: []
+        });
+      }
+    }
+
+    function showGameAlert(msg, type) {
+      const box = document.getElementById('gameAlert');
+      box.innerHTML = `<div class="alert ${type}">${msg}</div>`;
+      setTimeout(() => { box.innerHTML = ''; }, 3000);
+    }
+
+    // Charger les salons
+    socket.emit('getRooms');
+    
+    // Chat avec Entrée
+    document.getElementById('msgChat').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') envoyerMsg();
+    });
+  </script>
+</body>
+</html>
