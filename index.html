@@ -1,468 +1,467 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Triolet Online</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *{box-sizing:border-box;margin:0;padding:0}
     
-    body {
-      background: #0f172a;
-      color: #e2e8f0;
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      min-height: 100vh;
-      overflow-x: hidden;
+    body{
+      background:#0f172a;
+      color:#e2e8f0;
+      font-family:'Segoe UI',system-ui,sans-serif;
+      min-height:100vh;
     }
 
-    /* Header */
-    header {
-      background: #1e293b;
-      padding: 12px 24px;
-      border-bottom: 3px solid #f59e0b;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3);
+    /* ===== HEADER ===== */
+    header{
+      background:#1e293b;
+      padding:10px 20px;
+      border-bottom:3px solid #f59e0b;
+      display:flex;
+      align-items:center;
+      gap:10px;
     }
-    .logo {
-      width: 36px; height: 36px;
-      background: linear-gradient(135deg, #f59e0b, #d97706);
-      clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-      box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+    .logo{
+      width:32px;height:32px;
+      background:linear-gradient(135deg,#f59e0b,#d97706);
+      clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
     }
-    h1 { 
-      font-size: 1.8rem; 
-      background: linear-gradient(to right, #fbbf24, #f59e0b);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      font-weight: 800;
-      letter-spacing: -0.5px;
+    h1{
+      font-size:1.5rem;
+      font-weight:800;
+      color:#f59e0b;
     }
 
-    /* Layout principal */
-    .game-container {
-      display: flex;
-      gap: 20px;
-      padding: 20px;
-      max-width: 1400px;
-      margin: 0 auto;
-      align-items: flex-start;
+    /* ===== LOBBY ===== */
+    #screen-lobby{
+      max-width:420px;
+      margin:40px auto;
+      padding:0 16px;
+    }
+    .lobby-card{
+      background:#1e293b;
+      border-radius:12px;
+      padding:20px;
+      margin-bottom:16px;
+      border:1px solid #334155;
+    }
+    .lobby-title{
+      color:#fbbf24;
+      font-weight:700;
+      margin-bottom:12px;
+      font-size:1rem;
+    }
+    input,select{
+      width:100%;
+      padding:10px 12px;
+      border-radius:8px;
+      border:1px solid #334155;
+      background:#0f172a;
+      color:white;
+      margin-bottom:10px;
+      font-size:1rem;
+    }
+    input:focus,select:focus{
+      outline:none;
+      border-color:#f59e0b;
     }
 
-    /* Zone plateau + chevalet */
-    .board-zone {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      align-items: center;
+    /* ===== LAYOUT JEU ===== */
+    #screen-game{
+      display:none;
+      padding:10px;
     }
 
-    /* Plateau style réaliste */
-    .board-wrapper {
-      background: #1e3a5f;
-      padding: 8px;
-      border-radius: 4px;
-      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5), 0 0 0 2px #0f172a;
-      position: relative;
+    /* Desktop: plateau gauche, panel droit */
+    .game-layout{
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+      justify-content:center;
     }
 
-    /* Coordonnées */
-    .coord-row {
-      display: flex;
-      margin-left: 24px;
-      margin-bottom: 2px;
-    }
-    .coord-col {
-      width: 40px;
-      text-align: center;
-      font-size: 0.75rem;
-      color: #94a3b8;
-      font-weight: 600;
-    }
-    .coord-side {
-      position: absolute;
-      left: 4px;
-      top: 8px;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .coord-side span {
-      height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.75rem;
-      color: #94a3b8;
-      font-weight: 600;
-      width: 20px;
+    /* ===== PLATEAU ===== */
+    .board-area{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:8px;
     }
 
-    #board {
-      display: grid;
-      grid-template-columns: repeat(15, 40px);
-      grid-template-rows: repeat(15, 40px);
-      gap: 1px;
-      background: #0f172a;
-      margin-left: 24px;
+    .board-outer{
+      background:#1a3a6e;
+      border:3px solid #0f2a5e;
+      border-radius:4px;
+      padding:4px;
+      box-shadow:0 8px 32px rgba(0,0,0,0.5);
     }
 
-    .cell {
-      width: 40px; height: 40px;
-      background: #1e3a5f;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      position: relative;
-      transition: all 0.15s;
-      border-radius: 2px;
+    /* Numéros colonnes */
+    .col-labels{
+      display:grid;
+      grid-template-columns:20px repeat(15,36px);
+      margin-bottom:1px;
     }
-    .cell:hover:not(.occupied) { 
-      background: #2a4a6f; 
-      transform: scale(1.05);
-      z-index: 10;
-      box-shadow: 0 0 10px rgba(255,255,255,0.2);
+    .col-labels span{
+      text-align:center;
+      font-size:0.65rem;
+      color:#7dd3fc;
+      font-weight:600;
+      line-height:20px;
     }
 
-    /* Cases spéciales fidèles à la photo */
-    .cell.double { 
-      background: #3498db !important; 
-      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.3);
-    }
-    .cell.triple { 
-      background: #27ae60 !important;
-      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.3);
-    }
-    .cell.rejouer { 
-      background: #8e44ad !important;
-      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.3);
-    }
-    .cell.center { 
-      background: #f39c12 !important;
-      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.5);
+    .board-with-rows{
+      display:flex;
+      gap:1px;
     }
 
-    .cell-label {
-      font-size: 0.85rem;
-      font-weight: 700;
-      color: rgba(255,255,255,0.9);
-      pointer-events: none;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    /* Lettres lignes */
+    .row-labels{
+      display:flex;
+      flex-direction:column;
+      gap:1px;
+    }
+    .row-labels span{
+      width:20px;
+      height:36px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:0.65rem;
+      color:#7dd3fc;
+      font-weight:600;
     }
 
-    /* Jetons sur plateau */
-    .token {
-      width: 34px; height: 34px;
-      background: linear-gradient(135deg, #fef3c7, #fde68a);
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #1f2937;
-      font-weight: 900;
-      font-size: 1.1rem;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.5);
-      position: relative;
-      border: 1px solid #d4a017;
-      cursor: pointer;
-      transition: transform 0.1s;
-    }
-    .token:hover { transform: translateY(-2px); }
-    .token.joker {
-      background: linear-gradient(135deg, #ffe4c4, #ffcd94);
-      color: #8b4513;
-      font-style: italic;
-    }
-    .token .corner-val {
-      position: absolute;
-      bottom: 1px;
-      right: 2px;
-      font-size: 0.65rem;
-      background: rgba(139, 69, 19, 0.9);
-      color: white;
-      padding: 0 3px;
-      border-radius: 3px;
-      font-weight: 700;
-      line-height: 1.2;
-    }
-    .token.pending-token {
-      border: 2px solid #22c55e;
-      box-shadow: 0 0 0 2px rgba(34, 197, 87, 0.3), 0 4px 6px rgba(0,0,0,0.3);
-      animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.05); }
+    /* Grille */
+    #board{
+      display:grid;
+      grid-template-columns:repeat(15,36px);
+      grid-template-rows:repeat(15,36px);
+      gap:1px;
+      background:#0f2a5e; /* couleur du quadrillage */
     }
 
-    .cell.highlight {
-      background: #3b82f6 !important;
-      box-shadow: inset 0 0 0 3px #60a5fa;
+    .cell{
+      width:36px;height:36px;
+      background:#1e4080; /* bleu plateau uniforme */
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      position:relative;
+      transition:background 0.12s;
+      border-radius:1px;
+    }
+    .cell:hover{ background:#2a5090; }
+
+    /* Cases spéciales - fidèles à la photo */
+    .cell.sp-double{
+      background:#3b82f6; /* bleu clair */
+    }
+    .cell.sp-triple{
+      background:#16a34a; /* vert foncé */
+    }
+    .cell.sp-rejouer{
+      background:#7c3aed; /* violet */
+    }
+    .cell.sp-centre{
+      background:#d97706; /* orange */
     }
 
-    /* Chevalet compact sous le plateau */
-    .hand-section {
-      background: #1e293b;
-      padding: 16px;
-      border-radius: 12px;
-      width: 100%;
-      max-width: 650px;
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3);
-      border: 1px solid #334155;
-    }
-    .hand-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-    .hand-title {
-      font-size: 1rem;
-      color: #fbbf24;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    #hand-tokens {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      justify-content: center;
-      min-height: 60px;
-    }
-    .hand-token {
-      width: 50px; height: 50px;
-      background: linear-gradient(135deg, #fef3c7, #fde68a);
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #1f2937;
-      font-weight: 900;
-      font-size: 1.3rem;
-      cursor: pointer;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.5);
-      border: 2px solid transparent;
-      transition: all 0.2s;
-      position: relative;
-    }
-    .hand-token:hover { transform: translateY(-4px); box-shadow: 0 8px 12px rgba(0,0,0,0.3); }
-    .hand-token.selected { 
-      border-color: #22c55e; 
-      transform: translateY(-6px);
-      box-shadow: 0 0 0 3px rgba(34, 197, 87, 0.3), 0 8px 12px rgba(0,0,0,0.3);
-    }
-    .hand-token.joker {
-      background: linear-gradient(135deg, #ffe4c4, #ffcd94);
-      color: #8b4513;
-      font-style: italic;
-    }
-    .hand-token.empty-slot {
-      background: #334155;
-      box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
-      cursor: default;
-    }
-    .hand-token.empty-slot:hover { transform: none; }
-
-    /* Panneau latéral compact */
-    .side-panel {
-      width: 320px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
+    .cell-label{
+      font-size:0.75rem;
+      font-weight:700;
+      color:rgba(255,255,255,0.95);
+      text-shadow:0 1px 2px rgba(0,0,0,0.6);
+      pointer-events:none;
+      user-select:none;
     }
 
-    .panel-card {
-      background: #1e293b;
-      border-radius: 12px;
-      padding: 16px;
-      border: 1px solid #334155;
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);
+    /* Surbrillance cases valides */
+    .cell.can-place{
+      background:#1e5a30 !important;
+      box-shadow:inset 0 0 0 2px #22c55e;
+    }
+    .cell.can-place:hover{
+      background:#1a7a38 !important;
     }
 
-    .panel-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
+    /* ===== JETONS ===== */
+    .token{
+      width:32px;height:32px;
+      background:linear-gradient(145deg,#fef9e7,#f5d76e);
+      border-radius:4px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#1a1a1a;
+      font-weight:900;
+      font-size:0.95rem;
+      border:1.5px solid #c9a227;
+      box-shadow:0 2px 4px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.6);
+      position:relative;
+      user-select:none;
     }
-    .panel-title {
-      font-size: 0.9rem;
-      color: #fbbf24;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+    .token.is-joker{
+      background:linear-gradient(145deg,#fff3e0,#ffcc80);
+      color:#8b4513;
+      font-style:italic;
+      font-size:0.85rem;
     }
-
-    /* Scores */
-    .score-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 0;
-      border-bottom: 1px solid #334155;
+    .token.is-pending{
+      border:2px solid #22c55e;
+      box-shadow:0 0 8px rgba(34,197,94,0.5),inset 0 1px 0 rgba(255,255,255,0.6);
+      cursor:pointer;
     }
-    .score-row:last-child { border-bottom: none; }
-    .score-name { display: flex; align-items: center; gap: 8px; font-size: 0.95rem; }
-    .score-val { font-size: 1.3rem; font-weight: 800; color: #fbbf24; }
-    .current-turn { color: #22c55e; font-weight: 700; }
-
-    /* Journal avec toggle */
-    .log-controls {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-    .log-btn {
-      padding: 4px 12px;
-      border: none;
-      border-radius: 20px;
-      font-size: 0.75rem;
-      cursor: pointer;
-      background: #334155;
-      color: #94a3b8;
-      transition: all 0.2s;
-    }
-    .log-btn.active { background: #22c55e; color: white; }
-    
-    #message-log {
-      background: #0f172a;
-      border-radius: 8px;
-      padding: 12px;
-      font-size: 0.85rem;
-      max-height: 200px;
-      overflow-y: auto;
-      border: 1px solid #334155;
-    }
-    #message-log.compact p { margin-bottom: 2px; font-size: 0.8rem; }
-    #message-log p { margin-bottom: 6px; line-height: 1.4; }
-    #message-log p:last-child { margin-bottom: 0; }
-    .log-good { color: #4ade80; }
-    .log-bad { color: #f87171; }
-    .log-info { color: #60a5fa; }
-    .log-points { 
-      background: rgba(251, 191, 36, 0.1); 
-      color: #fbbf24; 
-      padding: 2px 6px; 
-      border-radius: 4px; 
-      font-weight: 700;
+    .token.is-pending:hover{ opacity:0.8; }
+    .token .joker-corner{
+      position:absolute;
+      bottom:1px;right:2px;
+      font-size:0.55rem;
+      font-weight:800;
+      color:#7c2d12;
+      line-height:1;
+      font-style:normal;
     }
 
-    /* Boutons actions */
-    .action-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
+    /* ===== CHEVALET ===== */
+    .hand-bar{
+      background:#1e293b;
+      border:1px solid #334155;
+      border-radius:10px;
+      padding:12px 16px;
+      width:100%;
+      max-width:580px;
     }
-    .btn {
-      padding: 10px;
-      border: none;
-      border-radius: 8px;
-      font-size: 0.85rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.2s;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+    .hand-bar-title{
+      font-size:0.8rem;
+      color:#94a3b8;
+      margin-bottom:8px;
+      text-align:center;
     }
-    .btn:hover { transform: translateY(-2px); opacity: 0.9; }
-    .btn-green { background: #22c55e; color: white; grid-column: span 2; }
-    .btn-blue { background: #3b82f6; color: white; }
-    .btn-gray { background: #475569; color: white; }
-    .btn-red { background: #ef4444; color: white; }
-
-    /* Modals */
-    .modal-overlay {
-      display: none;
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.8);
-      backdrop-filter: blur(4px);
-      z-index: 100;
-      align-items: center;
-      justify-content: center;
+    .hand-tokens{
+      display:flex;
+      gap:8px;
+      justify-content:center;
+      flex-wrap:wrap;
     }
-    .modal-overlay.active { display: flex; }
-    .modal {
-      background: #1e293b;
-      border-radius: 16px;
-      padding: 24px;
-      width: 360px;
-      border: 1px solid #334155;
-      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+    .hand-tok{
+      width:52px;height:52px;
+      background:linear-gradient(145deg,#fef9e7,#f5d76e);
+      border-radius:6px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#1a1a1a;
+      font-weight:900;
+      font-size:1.2rem;
+      border:2px solid transparent;
+      cursor:pointer;
+      box-shadow:0 3px 6px rgba(0,0,0,0.25),inset 0 1px 0 rgba(255,255,255,0.5);
+      transition:all 0.15s;
+      position:relative;
     }
-    .modal h2 {
-      color: #fbbf24;
-      margin-bottom: 16px;
-      text-align: center;
-      font-size: 1.3rem;
+    .hand-tok:hover{
+      transform:translateY(-4px);
+      box-shadow:0 6px 12px rgba(0,0,0,0.3);
     }
-    .joker-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-      margin: 16px 0;
+    .hand-tok.selected{
+      border-color:#22c55e;
+      transform:translateY(-6px);
+      box-shadow:0 0 0 3px rgba(34,197,94,0.35),0 6px 12px rgba(0,0,0,0.3);
     }
-    .joker-val {
-      padding: 12px;
-      background: #334155;
-      border-radius: 8px;
-      text-align: center;
-      cursor: pointer;
-      font-weight: 700;
-      transition: all 0.2s;
-    }
-    .joker-val:hover, .joker-val.selected {
-      background: #f59e0b;
-      color: #1f2937;
-      transform: scale(1.1);
+    .hand-tok.is-joker{
+      background:linear-gradient(145deg,#fff3e0,#ffcc80);
+      color:#8b4513;
+      font-style:italic;
     }
 
-    /* Écran lobby */
-    #screen-lobby {
-      max-width: 500px;
-      margin: 40px auto;
-      padding: 0 20px;
+    /* Boutons actions SOUS le chevalet */
+    .action-bar{
+      display:grid;
+      grid-template-columns:1fr 1fr 1fr 1fr;
+      gap:6px;
+      width:100%;
+      max-width:580px;
     }
-    .lobby-card {
-      background: #1e293b;
-      border-radius: 16px;
-      padding: 24px;
-      margin-bottom: 20px;
-      border: 1px solid #334155;
+    .btn{
+      padding:10px 6px;
+      border:none;
+      border-radius:8px;
+      font-size:0.8rem;
+      font-weight:700;
+      cursor:pointer;
+      transition:all 0.15s;
+      text-transform:uppercase;
+      letter-spacing:0.3px;
     }
-    .lobby-title {
-      color: #fbbf24;
-      font-size: 1.1rem;
-      margin-bottom: 16px;
-      font-weight: 700;
-    }
-    input, select {
-      width: 100%;
-      padding: 12px;
-      border-radius: 8px;
-      border: 1px solid #334155;
-      background: #0f172a;
-      color: white;
-      margin-bottom: 12px;
-      font-size: 1rem;
-    }
-    input:focus, select:focus {
-      outline: none;
-      border-color: #f59e0b;
-      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
-    }
+    .btn:hover{ opacity:0.85; transform:translateY(-1px); }
+    .btn-green{ background:#22c55e; color:white; }
+    .btn-gray{ background:#475569; color:white; }
+    .btn-blue{ background:#3b82f6; color:white; }
+    .btn-red{ background:#ef4444; color:white; }
 
-    /* Responsive */
-    @media (max-width: 1024px) {
-      .game-container { flex-direction: column; align-items: center; }
-      .side-panel { width: 100%; max-width: 650px; }
-      #board { grid-template-columns: repeat(15, 36px); grid-template-rows: repeat(15, 36px); }
-      .cell { width: 36px; height: 36px; }
-      .token { width: 30px; height: 30px; font-size: 1rem; }
+    /* ===== PANEL DROIT ===== */
+    .side-panel{
+      width:260px;
+      flex-shrink:0;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .panel-card{
+      background:#1e293b;
+      border-radius:10px;
+      padding:14px;
+      border:1px solid #334155;
+    }
+    .panel-title{
+      font-size:0.8rem;
+      color:#fbbf24;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:0.5px;
+      margin-bottom:10px;
+    }
+    .score-row{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding:6px 0;
+      border-bottom:1px solid #334155;
+      font-size:0.9rem;
+    }
+    .score-row:last-child{ border-bottom:none; }
+    .score-pts{
+      font-size:1.2rem;
+      font-weight:800;
+      color:#fbbf24;
+    }
+    .is-current{ color:#22c55e; font-weight:700; }
+
+    /* Journal */
+    .log-toggle{
+      display:flex;
+      gap:6px;
+      margin-bottom:8px;
+    }
+    .log-btn{
+      padding:3px 10px;
+      border:none;
+      border-radius:12px;
+      font-size:0.72rem;
+      cursor:pointer;
+      background:#334155;
+      color:#94a3b8;
+      font-weight:600;
+    }
+    .log-btn.on{ background:#22c55e; color:white; }
+    #log-box{
+      background:#0f172a;
+      border-radius:6px;
+      padding:8px;
+      max-height:180px;
+      overflow-y:auto;
+      font-size:0.8rem;
+      border:1px solid #334155;
+    }
+    #log-box p{ margin-bottom:4px; line-height:1.4; }
+    .lg{ color:#4ade80; }
+    .lb{ color:#f87171; }
+    .li{ color:#93c5fd; }
+    .lp{ color:#fbbf24; font-weight:700; }
+
+    /* ===== MODALS ===== */
+    .overlay{
+      display:none;
+      position:fixed;inset:0;
+      background:rgba(0,0,0,0.75);
+      backdrop-filter:blur(3px);
+      z-index:999;
+      align-items:center;
+      justify-content:center;
+    }
+    .overlay.on{ display:flex; }
+    .modal{
+      background:#1e293b;
+      border-radius:14px;
+      padding:22px;
+      width:320px;
+      border:1px solid #475569;
+      box-shadow:0 25px 50px rgba(0,0,0,0.5);
+    }
+    .modal h2{
+      color:#fbbf24;
+      text-align:center;
+      margin-bottom:14px;
+      font-size:1.2rem;
+    }
+    .modal p{
+      color:#94a3b8;
+      text-align:center;
+      margin-bottom:12px;
+      font-size:0.9rem;
+    }
+    .joker-grid{
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:6px;
+      margin-bottom:14px;
+    }
+    .jv{
+      padding:10px;
+      background:#334155;
+      border-radius:6px;
+      text-align:center;
+      cursor:pointer;
+      font-weight:700;
+      font-size:0.95rem;
+      transition:all 0.15s;
+    }
+    .jv:hover{ background:#f59e0b; color:#1a1a1a; transform:scale(1.08); }
+
+    /* Fin de partie */
+    .fin-row{
+      display:flex;
+      justify-content:space-between;
+      padding:8px 0;
+      border-bottom:1px solid #334155;
+      font-size:1rem;
+    }
+    .fin-row:last-child{ border-bottom:none; }
+    .fin-pts{ font-weight:800; color:#fbbf24; }
+
+    /* ===== RESPONSIVE MOBILE ===== */
+    @media(max-width:700px){
+      .game-layout{
+        flex-direction:column;
+        align-items:center;
+      }
+      .side-panel{
+        width:100%;
+        max-width:580px;
+      }
+      /* Plateau plus petit sur mobile */
+      #board{
+        grid-template-columns:repeat(15,28px);
+        grid-template-rows:repeat(15,28px);
+      }
+      .cell{ width:28px;height:28px; }
+      .token{ width:24px;height:24px;font-size:0.7rem; }
+      .col-labels span{ /* ajuste */
+        font-size:0.5rem;
+      }
+      .col-labels{
+        grid-template-columns:16px repeat(15,28px);
+      }
+      .row-labels span{
+        width:16px;height:28px;font-size:0.5rem;
+      }
+      .cell-label{ font-size:0.55rem; }
+      .hand-tok{ width:46px;height:46px;font-size:1rem; }
+      .action-bar{ grid-template-columns:1fr 1fr; }
     }
   </style>
 </head>
@@ -473,109 +472,121 @@
   <h1>Triolet Online</h1>
 </header>
 
-<!-- Écran Lobby -->
+<!-- LOBBY -->
 <div id="screen-lobby">
   <div class="lobby-card">
     <div class="lobby-title">👤 Votre profil</div>
-    <input type="text" id="input-pseudo" placeholder="Votre pseudo..." maxlength="15" value="Joueur"/>
+    <input id="inp-pseudo" type="text" placeholder="Votre pseudo..." maxlength="15" value="Joueur"/>
   </div>
-  
   <div class="lobby-card">
-    <div class="lobby-title">🎮 Nouvelle partie</div>
-    <select id="select-mode">
+    <div class="lobby-title">🎮 Mode de jeu</div>
+    <select id="inp-mode">
       <option value="solo">Solo vs IA</option>
-      <option value="local">2 Joueurs (local)</option>
+      <option value="local">2 Joueurs (même écran)</option>
     </select>
-    <button class="btn btn-green" style="width:100%;" onclick="startGame()">JOUER</button>
+    <button class="btn btn-green" style="width:100%;padding:14px;font-size:1rem;" onclick="startGame()">
+      ▶ JOUER
+    </button>
   </div>
 </div>
 
-<!-- Écran Jeu -->
-<div id="screen-game" style="display:none;">
-  <div class="game-container">
-    
-    <!-- Zone Plateau + Chevalet -->
-    <div class="board-zone">
-      <div class="board-wrapper">
-        <div class="coord-side" id="coord-rows"></div>
-        <div class="coord-row" id="coord-cols"></div>
-        <div id="board"></div>
+<!-- JEU -->
+<div id="screen-game">
+  <div class="game-layout">
+
+    <!-- GAUCHE : plateau + chevalet + actions -->
+    <div class="board-area" id="board-area">
+
+      <div class="board-outer">
+        <!-- Numéros colonnes -->
+        <div class="col-labels">
+          <span></span>
+          <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+          <span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+          <span>11</span><span>12</span><span>13</span><span>14</span><span>15</span>
+        </div>
+        <div class="board-with-rows">
+          <!-- Lettres lignes -->
+          <div class="row-labels">
+            <span>A</span><span>B</span><span>C</span><span>D</span><span>E</span>
+            <span>F</span><span>G</span><span>H</span><span>I</span><span>J</span>
+            <span>K</span><span>L</span><span>M</span><span>N</span><span>O</span>
+          </div>
+          <div id="board"></div>
+        </div>
       </div>
 
-      <div class="hand-section">
-        <div class="hand-header">
-          <div class="hand-title">🎴 Votre main</div>
-          <span style="color:#94a3b8;font-size:0.85rem;">Cliquez pour sélectionner, recliquez sur le plateau pour poser</span>
+      <!-- Chevalet juste sous le plateau -->
+      <div class="hand-bar">
+        <div class="hand-bar-title">
+          🎴 <span id="hand-title">Votre main</span>
+          &nbsp;—&nbsp;
+          <span style="color:#fbbf24;font-weight:700;">
+            Tour : <span id="current-name">-</span>
+          </span>
+          &nbsp;|&nbsp;
+          🎒 Sac : <span id="sac-count" style="color:#fbbf24;font-weight:700;">80</span>
         </div>
-        <div id="hand-tokens"></div>
+        <div id="hand-tokens" class="hand-tokens"></div>
       </div>
+
+      <!-- Boutons actions -->
+      <div class="action-bar">
+        <button class="btn btn-green" id="btn-valider">✅ Valider</button>
+        <button class="btn btn-gray"  id="btn-annuler">↩ Annuler</button>
+        <button class="btn btn-blue"  id="btn-echanger">🔄 Échanger</button>
+        <button class="btn btn-red"   id="btn-quitter">🚪 Quitter</button>
+      </div>
+
     </div>
 
-    <!-- Panneau latéral -->
+    <!-- DROITE : scores + journal -->
     <div class="side-panel">
-      
-      <!-- Scores -->
+
       <div class="panel-card">
         <div class="panel-title">🏆 Scores</div>
         <div id="scores-list"></div>
       </div>
 
-      <!-- Actions -->
       <div class="panel-card">
-        <div class="panel-title">⚡ Actions</div>
-        <div class="action-grid">
-          <button class="btn btn-green" id="btn-valider">Valider</button>
-          <button class="btn btn-blue" id="btn-annuler">Annuler</button>
-          <button class="btn btn-gray" id="btn-echanger">Échanger</button>
-          <button class="btn btn-red" id="btn-quitter">Quitter</button>
+        <div class="panel-title">📋 Journal</div>
+        <div class="log-toggle">
+          <button class="log-btn on" id="btn-lg-detail" onclick="setLog('detail')">Détaillé</button>
+          <button class="log-btn"    id="btn-lg-min"    onclick="setLog('min')">Minimum</button>
         </div>
-        <div style="margin-top:10px;font-size:0.8rem;color:#94a3b8;text-align:center;">
-          Sac: <span id="sac-count" style="color:#fbbf24;font-weight:700;">80</span> jetons
-        </div>
-      </div>
-
-      <!-- Journal -->
-      <div class="panel-card">
-        <div class="panel-header">
-          <div class="panel-title">📋 Journal</div>
-          <div class="log-controls">
-            <button class="log-btn active" onclick="setLogMode('detailed')" id="btn-detailed">Détaillé</button>
-            <button class="log-btn" onclick="setLogMode('compact')" id="btn-compact">Minimum</button>
-          </div>
-        </div>
-        <div id="message-log"></div>
+        <div id="log-box"></div>
       </div>
 
     </div>
   </div>
 </div>
 
-<!-- Modal Joker -->
-<div class="modal-overlay" id="modal-joker">
+<!-- MODAL JOKER -->
+<div class="overlay" id="modal-joker">
   <div class="modal">
     <h2>🃏 Valeur du Joker</h2>
-    <p style="text-align:center;color:#94a3b8;margin-bottom:16px;">Choisissez la valeur (0-15)</p>
+    <p>Quelle valeur (0-15) ce joker représente-t-il ?</p>
     <div class="joker-grid" id="joker-grid"></div>
-    <button class="btn btn-gray" style="width:100%;" onclick="closeJokerModal()">Annuler</button>
+    <button class="btn btn-gray" style="width:100%;" onclick="closeJoker()">Annuler</button>
   </div>
 </div>
 
-<!-- Modal Échange -->
-<div class="modal-overlay" id="modal-echange">
+<!-- MODAL ÉCHANGE -->
+<div class="overlay" id="modal-ech">
   <div class="modal">
-    <h2>🔄 Échanger des jetons</h2>
-    <p style="text-align:center;color:#94a3b8;margin-bottom:16px;">Sélectionnez 1 à 3 jetons</p>
-    <div id="echange-list" style="display:flex;gap:10px;justify-content:center;margin-bottom:20px;flex-wrap:wrap;"></div>
-    <button class="btn btn-green" style="width:100%;margin-bottom:8px;" onclick="confirmEchange()">Confirmer</button>
-    <button class="btn btn-gray" style="width:100%;" onclick="closeEchangeModal()">Annuler</button>
+    <h2>🔄 Échanger</h2>
+    <p>Sélectionnez 1 à 3 jetons à remettre dans le sac</p>
+    <div id="ech-tokens" style="display:flex;gap:8px;justify-content:center;margin:12px 0;flex-wrap:wrap;"></div>
+    <button class="btn btn-green" style="width:100%;margin-bottom:8px;" onclick="confirmEch()">Confirmer</button>
+    <button class="btn btn-gray"  style="width:100%;" onclick="closeEch()">Annuler</button>
   </div>
 </div>
 
-<!-- Modal Fin -->
-<div class="modal-overlay" id="modal-fin">
+<!-- MODAL FIN -->
+<div class="overlay" id="modal-fin">
   <div class="modal">
-    <h2>🎉 Partie terminée !</h2>
-    <div id="final-scores" style="margin:20px 0;"></div>
+    <h2>🎉 Fin de partie !</h2>
+    <div id="fin-scores" style="margin:16px 0;"></div>
     <button class="btn btn-green" style="width:100%;" onclick="location.reload()">Nouvelle partie</button>
   </div>
 </div>
@@ -583,4 +594,3 @@
 <script src="index.js"></script>
 </body>
 </html>
-
