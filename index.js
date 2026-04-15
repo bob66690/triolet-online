@@ -2,41 +2,25 @@
 //  TRIOLET ONLINE – index.js
 // ============================================================
 
-// ---------- DISTRIBUTION OFFICIELLE ----------
 const DISTRIBUTION = {
   0:9, 1:9, 2:8, 3:8, 4:7, 5:8, 6:6,
   7:6, 8:4, 9:4, 10:3, 11:3, 12:2, 13:2, 14:1, 15:1
 };
-// + 2 jokers = 83 jetons, on retire 3 → 80 en jeu
-
-// ---------- CASES SPÉCIALES (coordonnées officielles) ----------
-// Plateau : lignes A→O (0→14), colonnes 1→15 (0→14)
-// Attention : "de 1 à 15 de droite à gauche" = colonne 1 = index 14, colonne 15 = index 0
-// On garde r=ligne (A=0..O=14), c=colonne (1=0..15=14) pour simplifier l'affichage
-
-/*
-  REJOUER (violet) : A8, B2, B14, H1, H15, N2, N14, O8
-  X2 (bleu clair)  : D8, E5, E11, H4, H12, K5, K11, L8
-  X3 (vert foncé)  : B5, B11, E2, E14, K2, K14, N5, N11
-  CENTRE (jaune)   : H8
-*/
 
 function letterToRow(l) {
-  return l.toUpperCase().charCodeAt(0) - 65; // A=0, B=1...O=14
+  return l.toUpperCase().charCodeAt(0) - 65;
 }
 
 function buildSpecialCases() {
   const m = {};
-
   const rejouer = ['A8','B2','B14','H1','H15','N2','N14','O8'];
-  const doubles  = ['D8','E5','E11','H4','H12','K5','K11','L8'];
-  const triples  = ['B5','B11','E2','E14','K2','K14','N5','N11'];
-  const centre   = ['H8'];
+  const doubles = ['D8','E5','E11','H4','H12','K5','K11','L8'];
+  const triples = ['B5','B11','E2','E14','K2','K14','N5','N11'];
+  const centre  = ['H8'];
 
   function parse(str) {
-    const letter = str[0];
-    const col    = parseInt(str.slice(1)) - 1; // 1→0 .. 15→14
-    const row    = letterToRow(letter);
+    const row = letterToRow(str[0]);
+    const col = parseInt(str.slice(1)) - 1;
     return `${row},${col}`;
   }
 
@@ -44,17 +28,16 @@ function buildSpecialCases() {
   doubles.forEach(s => { m[parse(s)] = 'D'; });
   triples.forEach(s => { m[parse(s)] = 'T'; });
   centre.forEach(s  => { m[parse(s)] = 'C'; });
-
   return m;
 }
 
 const SPECIAL_CASES = buildSpecialCases();
 
-// ---------- ÉTAT DU JEU ----------
 let G = null;
 
+// ---------- CRÉATION DE PARTIE ----------
+
 function createGame(players) {
-  // Créer le sac
   const sac = [];
   for (const [val, qty] of Object.entries(DISTRIBUTION)) {
     for (let i = 0; i < qty; i++) {
@@ -63,21 +46,13 @@ function createGame(players) {
   }
   sac.push({ val: null, isJoker: true, jokerVal: null });
   sac.push({ val: null, isJoker: true, jokerVal: null });
-
   shuffle(sac);
-  sac.splice(0, 3); // retirer 3 jetons cachés
+  sac.splice(0, 3);
 
   const joueurs = players.map((name, i) => ({
-    name,
-    score: 0,
-    hand: [],
-    isIA: i > 0
+    name, score: 0, hand: [], isIA: i > 0
   }));
-
-  // Donner 3 jetons à chaque joueur
-  joueurs.forEach(j => {
-    j.hand = drawTokens(sac, 3);
-  });
+  joueurs.forEach(j => { j.hand = drawTokens(sac, 3); });
 
   return {
     board: Array.from({ length: 15 }, () => Array(15).fill(null)),
@@ -86,6 +61,8 @@ function createGame(players) {
     currentPlayerIndex: 0,
     firstMove: true,
     usedSpecials: new Set(),
+    // pending : jetons en cours de placement
+    // { tokenIndex, r, c, val, isJoker, jokerVal }
     pending: [],
     selectedTokenIndex: null,
     gameOver: false,
@@ -105,9 +82,7 @@ function shuffle(arr) {
 
 function drawTokens(sac, n) {
   const drawn = [];
-  for (let i = 0; i < n && sac.length > 0; i++) {
-    drawn.push(sac.pop());
-  }
+  for (let i = 0; i < n && sac.length > 0; i++) drawn.push(sac.pop());
   return drawn;
 }
 
@@ -119,35 +94,27 @@ function getSpecialType(r, c) {
 
 function effectiveVal(t) {
   if (!t) return null;
-  if (t.isJoker) return t.jokerVal;
-  return t.val;
-}
-
-function tokenLabel(t) {
-  if (!t) return '';
-  if (t.isJoker) return t.jokerVal !== null ? `X(${t.jokerVal})` : 'X';
-  return String(t.val);
+  return t.isJoker ? t.jokerVal : t.val;
 }
 
 // ---------- LOGIQUE PLATEAU ----------
 
 function boardWithPending() {
-  const b = G.board.map(row => row.map(cell => (cell ? { ...cell } : null)));
+  const b = G.board.map(row => row.map(c => c ? { ...c } : null));
   for (const p of G.pending) {
     b[p.r][p.c] = { val: p.val, isJoker: p.isJoker, jokerVal: p.jokerVal };
   }
   return b;
 }
 
-// Retourne la séquence continue passant par (r,c) dans la direction (dr,dc)
 function getLine(board, r, c, dr, dc) {
-  // Reculer jusqu'au début
   let sr = r, sc = c;
-  while (sr - dr >= 0 && sr - dr < 15 && sc - dc >= 0 && sc - dc < 15
-         && board[sr - dr][sc - dc] !== null) {
-    sr -= dr; sc -= dc;
-  }
-  // Avancer jusqu'à la fin
+  while (
+    sr - dr >= 0 && sr - dr < 15 &&
+    sc - dc >= 0 && sc - dc < 15 &&
+    board[sr - dr][sc - dc] !== null
+  ) { sr -= dr; sc -= dc; }
+
   const line = [];
   let cr = sr, cc = sc;
   while (cr >= 0 && cr < 15 && cc >= 0 && cc < 15 && board[cr][cc] !== null) {
@@ -157,7 +124,6 @@ function getLine(board, r, c, dr, dc) {
   return line;
 }
 
-// Toutes les lignes (≥2 jetons) touchées par les pending
 function getAffectedLines() {
   const vBoard = boardWithPending();
   const lines  = [];
@@ -183,14 +149,15 @@ function getAffectedLines() {
 function isAdjacentToExisting(r, c) {
   for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
     const nr = r + dr, nc = c + dc;
-    if (nr >= 0 && nr < 15 && nc >= 0 && nc < 15 && G.board[nr][nc] !== null) {
+    if (nr >= 0 && nr < 15 && nc >= 0 && nc < 15 && G.board[nr][nc] !== null)
       return true;
-    }
   }
   return false;
 }
 
-function wouldCreate2x2(board) {
+// ── CORRECTION 1 : carré interdit UNIQUEMENT au premier tour ──
+function wouldCreate2x2AtFirstMove(board) {
+  if (!G.firstMove) return false; // ignoré après le 1er tour
   for (let r = 0; r < 14; r++) {
     for (let c = 0; c < 14; c++) {
       if (board[r][c] && board[r+1][c] && board[r][c+1] && board[r+1][c+1]) {
@@ -210,62 +177,46 @@ function validatePlacement() {
   if (G.pending.length === 0) return { ok: false, msg: 'Aucun jeton à placer.' };
   if (G.pending.length > 3)   return { ok: false, msg: 'Maximum 3 jetons par tour.' };
 
-  // Joker: valeur définie ?
   for (const p of G.pending) {
-    if (p.isJoker && p.jokerVal === null) {
+    if (p.isJoker && p.jokerVal === null)
       return { ok: false, msg: 'Définissez la valeur du joker.' };
-    }
   }
 
-  // Tous sur la même ligne ou colonne
   const rows = [...new Set(G.pending.map(p => p.r))];
   const cols = [...new Set(G.pending.map(p => p.c))];
-  if (rows.length > 1 && cols.length > 1) {
+  if (rows.length > 1 && cols.length > 1)
     return { ok: false, msg: 'Les jetons doivent être sur la même ligne ou colonne.' };
-  }
 
-  // Premier coup : doit couvrir H8 (r=7, c=7)
   if (G.firstMove) {
-    if (!G.pending.some(p => p.r === 7 && p.c === 7)) {
+    if (!G.pending.some(p => p.r === 7 && p.c === 7))
       return { ok: false, msg: 'Le premier jeton doit couvrir la case centrale H8.' };
-    }
   } else {
-    // Au moins un adjacent à un jeton existant
-    if (!G.pending.some(p => isAdjacentToExisting(p.r, p.c))) {
+    if (!G.pending.some(p => isAdjacentToExisting(p.r, p.c)))
       return { ok: false, msg: 'Les jetons doivent être adjacents à un jeton déjà posé.' };
-    }
   }
 
-  // Vérifier les séquences
   const vBoard = boardWithPending();
   const lines  = getAffectedLines();
 
   for (const line of lines) {
-    if (line.length > 3) {
-      return { ok: false, msg: 'Maximum 3 jetons côte à côte dans un même sens.' };
-    }
+    if (line.length > 3)
+      return { ok: false, msg: 'Maximum 3 jetons côte à côte.' };
     const vals = line.map(l => effectiveVal(l.token));
-    if (vals.some(v => v === null)) {
+    if (vals.some(v => v === null))
       return { ok: false, msg: 'La valeur du joker doit être définie.' };
-    }
     const sum = vals.reduce((a, b) => a + b, 0);
-    if (line.length === 2 && sum > 15) {
-      return { ok: false, msg: `2 jetons côte à côte : total ${sum} > 15.` };
-    }
-    if (line.length === 3 && sum !== 15) {
-      return { ok: false, msg: `3 jetons côte à côte : total ${sum} ≠ 15 (Trio obligatoire).` };
-    }
+    if (line.length === 2 && sum > 15)
+      return { ok: false, msg: `2 jetons : total ${sum} > 15.` };
+    if (line.length === 3 && sum !== 15)
+      return { ok: false, msg: `3 jetons : total ${sum} ≠ 15 (doit faire exactement 15).` };
   }
 
-  // Pas de carré 2×2
-  if (wouldCreate2x2(vBoard)) {
-    return { ok: false, msg: 'Ce placement formerait un carré interdit.' };
-  }
+  // Carré interdit seulement au 1er tour
+  if (wouldCreate2x2AtFirstMove(vBoard))
+    return { ok: false, msg: 'Interdit de former un carré au premier tour.' };
 
-  // Pas 2 jokers au même tour
-  if (G.pending.filter(p => p.isJoker).length >= 2) {
+  if (G.pending.filter(p => p.isJoker).length >= 2)
     return { ok: false, msg: 'Interdit de poser 2 jokers au même tour.' };
-  }
 
   return { ok: true };
 }
@@ -274,19 +225,38 @@ function validatePlacement() {
 
 function calculateScore() {
   let total = 0;
-  const lines          = getAffectedLines();
-  const hasJoker       = G.pending.some(p => p.isJoker);
-  const allThreePending = G.pending.length === 3;
-  let   trioletDone    = false;
+  const lines    = getAffectedLines();
+  const hasJoker = G.pending.some(p => p.isJoker);
+
+  // ── CORRECTION 2 : détection Triolet ──
+  // Triolet = les 3 jetons du chevalet posés EN UNE SEULE FOIS
+  // formant EUX-MÊMES un Trio (les 3 pending sont dans la même ligne)
+  let isTriolet = false;
+  if (G.pending.length === 3 && !hasJoker) {
+    // Vérifier que les 3 pending sont tous dans la même ligne affectée
+    for (const line of lines) {
+      const allPendingInLine = G.pending.every(p =>
+        line.some(l => l.r === p.r && l.c === p.c)
+      );
+      if (allPendingInLine && line.length === 3) {
+        const vals = line.map(l => effectiveVal(l.token));
+        const sum  = vals.reduce((a, b) => a + b, 0);
+        if (sum === 15) { isTriolet = true; break; }
+      }
+    }
+  }
+
+  let trioletBonus = isTriolet ? 50 : 0;
+  let trioletApplied = false;
 
   for (const line of lines) {
-    const vals  = line.map(l => effectiveVal(l.token));
-    const sum   = vals.reduce((a, b) => a + b, 0);
-    const isPendingLine = line.every(l => G.pending.some(p => p.r === l.r && p.c === l.c));
+    const vals = line.map(l => effectiveVal(l.token));
+    const sum  = vals.reduce((a, b) => a + b, 0);
 
-    // Chercher une case spéciale parmi les pending de cette ligne
+    // Case spéciale sur un jeton pending de cette ligne
     let multiplier     = 1;
     let specialUsedKey = null;
+
     for (const p of G.pending) {
       if (!line.some(l => l.r === p.r && l.c === p.c)) continue;
       const sp = getSpecialType(p.r, p.c);
@@ -299,14 +269,20 @@ function calculateScore() {
     }
 
     if (line.length === 3 && sum === 15) {
-      // Trio = 30 × multiplier
       let pts = 30 * multiplier;
 
-      // Triolet : les 3 jetons sont TOUS nouveaux (pending), pas de joker
-      if (allThreePending && !trioletDone && isPendingLine && !hasJoker) {
-        pts += 50;
-        trioletDone = true;
-        log(`🎉 TRIOLET ! 30×${multiplier}=${30*multiplier} + 50 bonus = ${pts} pts`, 'good');
+      // Ajouter le bonus Triolet UNE SEULE FOIS sur la ligne triolet
+      if (isTriolet && !trioletApplied) {
+        const allPendingInLine = G.pending.every(p =>
+          line.some(l => l.r === p.r && l.c === p.c)
+        );
+        if (allPendingInLine) {
+          pts += trioletBonus;
+          trioletApplied = true;
+          log(`🎉 TRIOLET ! Trio×${multiplier}=${30*multiplier} + bonus 50 = ${pts} pts`, 'good');
+        } else {
+          log(`✅ Trio = 30×${multiplier} = ${30*multiplier} pts`, 'good');
+        }
       } else {
         log(`✅ Trio = 30×${multiplier} = ${30*multiplier} pts`, 'good');
       }
@@ -315,7 +291,6 @@ function calculateScore() {
       total += pts;
 
     } else if (line.length === 2) {
-      // Paire : somme des valeurs (avec case spéciale sur le jeton posé)
       let pts = 0;
       for (const item of line) {
         const isNew = G.pending.some(p => p.r === item.r && p.c === item.c);
@@ -323,11 +298,9 @@ function calculateScore() {
         if (isNew) {
           const sp = getSpecialType(item.r, item.c);
           if (sp === 'D' || sp === 'C') {
-            pts += v * 2;
-            G.usedSpecials.add(`${item.r},${item.c}`);
+            pts += v * 2; G.usedSpecials.add(`${item.r},${item.c}`);
           } else if (sp === 'T') {
-            pts += v * 3;
-            G.usedSpecials.add(`${item.r},${item.c}`);
+            pts += v * 3; G.usedSpecials.add(`${item.r},${item.c}`);
           } else {
             pts += v;
           }
@@ -340,12 +313,12 @@ function calculateScore() {
     }
   }
 
-  // Case Rejouer ?
+  // Case Rejouer
   for (const p of G.pending) {
     if (getSpecialType(p.r, p.c) === 'R') {
       G.rejouerFlag = true;
       G.usedSpecials.add(`${p.r},${p.c}`);
-      log('🔁 Case Rejouer ! Vous rejouez immédiatement.', 'good');
+      log('🔁 Case Rejouer !', 'good');
       break;
     }
   }
@@ -364,30 +337,22 @@ function confirmMove() {
   player.score += pts;
   log(`${player.name} marque ${pts} pts → Total : ${player.score}`, 'good');
 
-  // ── Fixer les jetons sur le plateau ──
-  // IMPORTANT : trier par index décroissant avant de splice pour ne pas décaler
-  const sortedPending = [...G.pending].sort((a, b) => b.tokenIndex - a.tokenIndex);
-
+  // Fixer les jetons sur le plateau
   for (const p of G.pending) {
     G.board[p.r][p.c] = {
-      val:      p.val,
-      isJoker:  p.isJoker,
-      jokerVal: p.jokerVal
+      val: p.val, isJoker: p.isJoker, jokerVal: p.jokerVal
     };
   }
 
-  // Retirer les jetons de la main (indices décroissants pour ne pas décaler)
-  for (const p of sortedPending) {
-    player.hand.splice(p.tokenIndex, 1);
-  }
+  // Retirer de la main (indices décroissants)
+  const sortedIdx = [...G.pending]
+    .sort((a, b) => b.tokenIndex - a.tokenIndex)
+    .map(p => p.tokenIndex);
+  sortedIdx.forEach(i => player.hand.splice(i, 1));
 
-  // Repioche exactement autant que posé
-  const nbPosed = G.pending.length;
-  const drawn   = drawTokens(G.sac, nbPosed);
+  // Repioche exactement le nombre posé
+  const drawn = drawTokens(G.sac, G.pending.length);
   player.hand.push(...drawn);
-
-  // Vérifier que le chevalet a bien 3 jetons (ou moins si sac vide)
-  const expected = Math.min(3, player.hand.length + G.sac.length);
 
   G.pending            = [];
   G.selectedTokenIndex = null;
@@ -398,7 +363,7 @@ function confirmMove() {
   if (G.rejouerFlag) {
     G.rejouerFlag = false;
     render();
-    return; // le même joueur rejoue
+    return;
   }
 
   nextPlayer();
@@ -413,53 +378,38 @@ function cancelMove() {
 function nextPlayer() {
   G.currentPlayerIndex = (G.currentPlayerIndex + 1) % G.joueurs.length;
   render();
-  if (G.joueurs[G.currentPlayerIndex].isIA) {
-    setTimeout(iaPlay, 900);
-  }
+  if (G.joueurs[G.currentPlayerIndex].isIA) setTimeout(iaPlay, 900);
 }
 
 function checkEndGame() {
   const player = G.joueurs[G.currentPlayerIndex];
-
-  // Fin : sac vide ET joueur actuel a posé son dernier jeton
   if (G.sac.length === 0 && player.hand.length === 0) {
     let bonus = 0;
     G.joueurs.forEach((j, i) => {
       if (i !== G.currentPlayerIndex) {
         const sum = j.hand.reduce((a, t) => a + (effectiveVal(t) || 0), 0);
         bonus += sum;
-        log(`${j.name} a ${j.hand.map(t => effectiveVal(t)).join('+')} = ${sum} pts perdus`, 'bad');
+        log(`${j.name} perd ${sum} pts (jetons restants)`, 'bad');
       }
     });
     player.score += bonus;
-    log(`🏆 ${player.name} remporte ${bonus} pts bonus de fin !`, 'good');
     G.gameOver = true;
     setTimeout(showFinModal, 600);
     return true;
   }
-
-  // Cas : tout le monde bloqué
-  const allBlocked = G.joueurs.every(j => j.hand.length === 0);
-  if (allBlocked) {
-    G.gameOver = true;
-    setTimeout(showFinModal, 600);
-    return true;
-  }
-
   return false;
 }
 
 function showFinModal() {
   const sorted = [...G.joueurs].sort((a, b) => b.score - a.score);
   document.getElementById('fin-winner').textContent = `🥇 ${sorted[0].name} gagne !`;
-  const div = document.getElementById('fin-scores');
-  div.innerHTML = sorted.map((j, i) =>
+  document.getElementById('fin-scores').innerHTML = sorted.map((j, i) =>
     `<div>${['🥇','🥈','🥉','4️⃣'][i]} ${j.name} : ${j.score} pts</div>`
   ).join('');
   document.getElementById('modal-fin').classList.add('active');
 }
 
-// ---------- IA SIMPLE ----------
+// ---------- IA ----------
 
 function iaPlay() {
   const player = G.joueurs[G.currentPlayerIndex];
@@ -468,7 +418,6 @@ function iaPlay() {
   let bestMove = null;
   let bestPts  = -1;
 
-  // Essayer chaque jeton de la main sur chaque case valide
   for (let hi = 0; hi < player.hand.length; hi++) {
     const token = player.hand[hi];
     for (let r = 0; r < 15; r++) {
@@ -477,23 +426,15 @@ function iaPlay() {
         if (G.firstMove && !(r === 7 && c === 7)) continue;
         if (!G.firstMove && !isAdjacentToExisting(r, c)) continue;
 
-        const jokerVal = token.isJoker ? 7 : null;
-
         G.pending = [{
-          tokenIndex: hi,
-          r, c,
-          val:      token.val,
-          isJoker:  token.isJoker,
-          jokerVal: jokerVal
+          tokenIndex: hi, r, c,
+          val: token.val, isJoker: token.isJoker,
+          jokerVal: token.isJoker ? 7 : null
         }];
 
-        const check = validatePlacement();
-        if (check.ok) {
+        if (validatePlacement().ok) {
           const pts = calculateScore();
-          if (pts > bestPts) {
-            bestPts  = pts;
-            bestMove = { hi, r, c, token, jokerVal };
-          }
+          if (pts > bestPts) { bestPts = pts; bestMove = { hi, r, c, token }; }
         }
         G.pending = [];
       }
@@ -501,39 +442,27 @@ function iaPlay() {
   }
 
   if (bestMove) {
-    const { hi, r, c, token, jokerVal } = bestMove;
+    const { hi, r, c, token } = bestMove;
     G.pending = [{
-      tokenIndex: hi,
-      r, c,
-      val:      token.val,
-      isJoker:  token.isJoker,
-      jokerVal: jokerVal
+      tokenIndex: hi, r, c,
+      val: token.val, isJoker: token.isJoker,
+      jokerVal: token.isJoker ? 7 : null
     }];
-
     const pts = calculateScore();
     player.score += pts;
-    log(`🤖 ${player.name} joue ${token.isJoker ? 'X' : token.val} en ${String.fromCharCode(65+r)}${c+1} → ${pts} pts`, 'info');
-
-    G.board[r][c] = { val: token.val, isJoker: token.isJoker, jokerVal };
+    G.board[r][c] = { val: token.val, isJoker: token.isJoker, jokerVal: token.isJoker ? 7 : null };
     player.hand.splice(hi, 1);
-
-    // Repioche exactement 1 jeton
-    const drawn = drawTokens(G.sac, 1);
-    player.hand.push(...drawn);
-
-    G.pending            = [];
-    G.firstMove          = false;
-
+    player.hand.push(...drawTokens(G.sac, 1));
+    log(`🤖 ${player.name} joue ${token.isJoker ? 'X' : token.val} en ${String.fromCharCode(65+r)}${c+1} → ${pts} pts`, 'info');
+    G.pending   = [];
+    G.firstMove = false;
     if (!checkEndGame()) nextPlayer();
   } else {
-    // IA passe : échange si possible
-    if (G.sac.length >= 5 && player.hand.length > 0) {
+    if (G.sac.length >= 5) {
       const t = player.hand.pop();
-      G.sac.unshift(t);
-      shuffle(G.sac);
-      const drawn = drawTokens(G.sac, 1);
-      player.hand.push(...drawn);
-      log(`🤖 ${player.name} échange un jeton.`, 'info');
+      G.sac.push(t); shuffle(G.sac);
+      player.hand.push(...drawTokens(G.sac, 1));
+      log(`🤖 ${player.name} échange.`, 'info');
     } else {
       log(`🤖 ${player.name} passe.`, 'info');
     }
@@ -573,43 +502,46 @@ function renderBoard() {
         if (sp === 'C') cell.classList.add('center');
       }
 
-      // Label case vide
-      if (!G.board[r][c] && !G.pending.some(p => p.r === r && p.c === c)) {
-        if (!used && sp) {
-          if (sp === 'R') cell.textContent = '↺';
-          else if (sp === 'D' || sp === 'C') cell.textContent = '×2';
-          else if (sp === 'T') cell.textContent = '×3';
-        }
-      }
-
-      // Jeton posé sur le plateau
+      // Jeton fixé sur le plateau
       if (G.board[r][c]) {
         const t   = G.board[r][c];
-        const tok = document.createElement('div');
-        tok.className = 'token' + (t.isJoker ? ' joker-token' : '');
-        tok.textContent = t.isJoker
-          ? (t.jokerVal !== null ? `X` : 'X')
-          : t.val;
-        if (t.isJoker) tok.title = `Joker = ${t.jokerVal}`;
+        const tok = createTokenEl(t, false);
         cell.appendChild(tok);
-      }
 
-      // Jeton pending (en cours de placement)
-      const pend = G.pending.find(p => p.r === r && p.c === c);
-      if (pend) {
-        cell.innerHTML = '';
-        const tok = document.createElement('div');
-        tok.className = 'token pending-on-board' + (pend.isJoker ? ' joker-token' : '');
-        tok.textContent = pend.isJoker ? `X(${pend.jokerVal})` : pend.val;
-        cell.appendChild(tok);
-      }
+      // Jeton pending sur cette case
+      } else {
+        const pend = G.pending.find(p => p.r === r && p.c === c);
+        if (pend) {
+          const tok = createTokenEl(
+            { val: pend.val, isJoker: pend.isJoker, jokerVal: pend.jokerVal },
+            true // c'est un pending
+          );
+          cell.appendChild(tok);
+          // Clic sur le jeton pending → le récupérer
+          tok.addEventListener('click', (e) => {
+            e.stopPropagation();
+            removePendingByPos(r, c);
+          });
 
-      // Surbrillance cases valides
-      if (G.selectedTokenIndex !== null && !G.board[r][c] && !pend) {
-        if (G.firstMove) {
-          if (r === 7 && c === 7) cell.classList.add('highlight');
         } else {
-          if (isAdjacentToExisting(r, c)) cell.classList.add('highlight');
+          // Case vide : label spéciale
+          if (!used && sp) {
+            const lbl = document.createElement('span');
+            lbl.className = 'cell-label';
+            lbl.textContent =
+              sp === 'R' ? '↺' :
+              (sp === 'D' || sp === 'C') ? '×2' : '×3';
+            cell.appendChild(lbl);
+          }
+
+          // Surbrillance si jeton sélectionné
+          if (G.selectedTokenIndex !== null) {
+            if (G.firstMove) {
+              if (r === 7 && c === 7) cell.classList.add('highlight');
+            } else {
+              if (isAdjacentToExisting(r, c)) cell.classList.add('highlight');
+            }
+          }
         }
       }
 
@@ -617,6 +549,85 @@ function renderBoard() {
       boardEl.appendChild(cell);
     }
   }
+}
+
+// ── CORRECTION 3 : valeur du joker dans l'angle ──
+// ── CORRECTION 4 : createTokenEl unifié ──
+function createTokenEl(t, isPending) {
+  const tok = document.createElement('div');
+  tok.className = 'token' + (t.isJoker ? ' joker-token' : '') + (isPending ? ' token-pending' : '');
+
+  if (t.isJoker) {
+    // Lettre X grande
+    const main = document.createElement('span');
+    main.className = 'token-main';
+    main.textContent = 'X';
+    tok.appendChild(main);
+
+    // ── Valeur du joker dans l'angle bas-droit ──
+    if (t.jokerVal !== null && t.jokerVal !== undefined) {
+      const corner = document.createElement('span');
+      corner.className = 'token-corner';
+      corner.textContent = t.jokerVal;
+      tok.appendChild(corner);
+    }
+  } else {
+    const main = document.createElement('span');
+    main.className = 'token-main';
+    main.textContent = t.val;
+    tok.appendChild(main);
+  }
+
+  if (isPending) tok.title = 'Cliquez pour récupérer ce jeton';
+  return tok;
+}
+
+// ── CORRECTION 4 : chevalet sans les jetons déjà placés ──
+function renderChevalet() {
+  const player = G.joueurs[0];
+  const cont   = document.getElementById('chevalet');
+  cont.innerHTML = '';
+
+  // Indices des jetons déjà dans pending
+  const pendingIndices = new Set(G.pending.map(p => p.tokenIndex));
+
+  player.hand.forEach((t, i) => {
+    if (pendingIndices.has(i)) return; // ← ne pas afficher si déjà posé
+
+    const div = document.createElement('div');
+    div.className = 'hand-token' + (t.isJoker ? ' joker' : '');
+    if (G.selectedTokenIndex === i) div.classList.add('selected');
+
+    if (t.isJoker) {
+      const main = document.createElement('span');
+      main.className = 'token-main';
+      main.textContent = 'X';
+      div.appendChild(main);
+    } else {
+      div.textContent = t.val;
+    }
+
+    div.addEventListener('click', () => onSelectToken(i));
+    cont.appendChild(div);
+  });
+}
+
+function renderPending() {
+  // Le panneau "À placer" reste pour info mais les jetons sont
+  // maintenant visibles directement sur le plateau
+  const cont = document.getElementById('pending-tokens');
+  cont.innerHTML = '';
+  if (G.pending.length === 0) {
+    cont.innerHTML = '<span style="color:#aaa;font-size:0.8rem;">Sélectionnez un jeton puis cliquez sur le plateau</span>';
+    return;
+  }
+  G.pending.forEach((p) => {
+    const div = document.createElement('div');
+    div.className = 'pending-token' + (p.isJoker ? ' joker' : '');
+    div.textContent = p.isJoker ? `X(${p.jokerVal ?? '?'})` : p.val;
+    div.title = `En ${String.fromCharCode(65+p.r)}${p.c+1} — cliquez sur le plateau pour récupérer`;
+    cont.appendChild(div);
+  });
 }
 
 function renderScores() {
@@ -629,56 +640,12 @@ function renderScores() {
     ).join('');
 }
 
-function renderChevalet() {
-  const player = G.joueurs[0]; // toujours le joueur humain
-  const cont   = document.getElementById('chevalet');
-  cont.innerHTML = '';
-
-  player.hand.forEach((t, i) => {
-    const div = document.createElement('div');
-    div.className = 'hand-token' + (t.isJoker ? ' joker' : '');
-    if (G.selectedTokenIndex === i) div.classList.add('selected');
-    div.textContent = t.isJoker ? 'X' : t.val;
-    div.title = t.isJoker ? 'Joker' : `Valeur : ${t.val}`;
-    div.addEventListener('click', () => onSelectToken(i));
-    cont.appendChild(div);
-  });
-
-  // Afficher le nombre de jetons (debug)
-  const info = document.createElement('div');
-  info.style.cssText = 'font-size:0.7rem;color:#aaa;width:100%;margin-top:4px;';
-  info.textContent = `${player.hand.length} jeton(s)`;
-  cont.appendChild(info);
-}
-
-function renderPending() {
-  const cont = document.getElementById('pending-tokens');
-  cont.innerHTML = '';
-  G.pending.forEach((p, i) => {
-    const div = document.createElement('div');
-    div.className = 'pending-token' + (p.isJoker ? ' joker' : '');
-    div.textContent = p.isJoker ? `X(${p.jokerVal ?? '?'})` : p.val;
-    div.title = `Annuler : ${String.fromCharCode(65+p.r)}${p.c+1}`;
-    div.addEventListener('click', () => removePending(i));
-    cont.appendChild(div);
-  });
-}
-
-function removePending(i) {
-  G.pending.splice(i, 1);
-  render();
-}
-
 // ---------- INTERACTIONS ----------
 
 function onSelectToken(index) {
   if (G.gameOver) return;
   if (G.joueurs[G.currentPlayerIndex].isIA) return;
-
-  // Déjà dans pending ?
-  const alreadyPlaced = G.pending.some(p => p.tokenIndex === index);
-  if (alreadyPlaced) return;
-
+  if (G.pending.some(p => p.tokenIndex === index)) return;
   G.selectedTokenIndex = (G.selectedTokenIndex === index) ? null : index;
   render();
 }
@@ -686,9 +653,17 @@ function onSelectToken(index) {
 function onCellClick(r, c) {
   if (G.gameOver) return;
   if (G.joueurs[G.currentPlayerIndex].isIA) return;
-  if (G.selectedTokenIndex === null) return;
+
+  // Si case déjà occupée par un jeton fixé → rien
   if (G.board[r][c] !== null) return;
-  if (G.pending.some(p => p.r === r && p.c === c)) return;
+
+  // Si case occupée par un pending → récupérer
+  if (G.pending.some(p => p.r === r && p.c === c)) {
+    removePendingByPos(r, c);
+    return;
+  }
+
+  if (G.selectedTokenIndex === null) return;
 
   const player = G.joueurs[0];
   const token  = player.hand[G.selectedTokenIndex];
@@ -701,11 +676,23 @@ function onCellClick(r, c) {
   G.pending.push({
     tokenIndex: G.selectedTokenIndex,
     r, c,
-    val:      token.val,
-    isJoker:  false,
-    jokerVal: null
+    val: token.val, isJoker: false, jokerVal: null
   });
+  G.selectedTokenIndex = null;
+  render();
+}
 
+// ── CORRECTION 4 : récupérer un jeton depuis le plateau ──
+function removePendingByPos(r, c) {
+  const idx = G.pending.findIndex(p => p.r === r && p.c === c);
+  if (idx === -1) return;
+  G.pending.splice(idx, 1);
+  G.selectedTokenIndex = null;
+  render();
+}
+
+function removePending(i) {
+  G.pending.splice(i, 1);
   G.selectedTokenIndex = null;
   render();
 }
@@ -731,16 +718,11 @@ function openJokerModal(r, c) {
 function confirmJokerVal(val) {
   document.getElementById('modal-joker').classList.remove('active');
   if (!jokerPos) return;
-
   G.pending.push({
     tokenIndex: G.selectedTokenIndex,
-    r:        jokerPos.r,
-    c:        jokerPos.c,
-    val:      null,
-    isJoker:  true,
-    jokerVal: val
+    r: jokerPos.r, c: jokerPos.c,
+    val: null, isJoker: true, jokerVal: val
   });
-
   jokerPos             = null;
   G.selectedTokenIndex = null;
   render();
@@ -784,27 +766,19 @@ function openEchangeModal() {
 
 document.getElementById('btn-echange-confirm').addEventListener('click', () => {
   if (echangeSelected.length === 0) {
-    log('❌ Sélectionnez au moins un jeton à échanger.', 'bad');
-    return;
+    log('❌ Sélectionnez au moins un jeton.', 'bad'); return;
   }
   if (G.sac.length < 5) {
-    log('❌ Il faut au moins 5 jetons dans le sac pour échanger.', 'bad');
+    log('❌ Moins de 5 jetons dans le sac : échange impossible.', 'bad');
     document.getElementById('modal-echange').classList.remove('active');
     return;
   }
-
   const player  = G.joueurs[0];
   const sorted  = [...echangeSelected].sort((a, b) => b - a);
   const removed = sorted.map(i => player.hand.splice(i, 1)[0]);
-
-  // Remettre dans le sac et mélanger
   G.sac.push(...removed);
   shuffle(G.sac);
-
-  // Repioche le même nombre
-  const drawn = drawTokens(G.sac, removed.length);
-  player.hand.push(...drawn);
-
+  player.hand.push(...drawTokens(G.sac, removed.length));
   log(`🔄 ${player.name} échange ${removed.length} jeton(s).`, 'info');
   document.getElementById('modal-echange').classList.remove('active');
   nextPlayer();
@@ -814,7 +788,7 @@ document.getElementById('btn-echange-cancel').addEventListener('click', () => {
   document.getElementById('modal-echange').classList.remove('active');
 });
 
-// ---------- BOUTONS PRINCIPAUX ----------
+// ---------- BOUTONS ----------
 
 document.getElementById('btn-valider').addEventListener('click', () => {
   if (G.joueurs[G.currentPlayerIndex].isIA) {
@@ -882,4 +856,3 @@ function log(msg, type = '') {
   div.prepend(p);
   while (div.children.length > 30) div.removeChild(div.lastChild);
 }
-
