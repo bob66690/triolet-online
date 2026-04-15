@@ -1,5 +1,5 @@
 // ============================================================
-//  TRIOLET ONLINE – index.js
+//  TRIOLET ONLINE - Version optimisée
 // ============================================================
 
 const DISTRIBUTION = {
@@ -7,466 +7,353 @@ const DISTRIBUTION = {
   7:6, 8:4, 9:4, 10:3, 11:3, 12:2, 13:2, 14:1, 15:1
 };
 
-function letterToRow(l) {
-  return l.toUpperCase().charCodeAt(0) - 65;
+// Cases spéciales exactes du plateau photo
+const SPECIAL_CASES = {};
+const CASES_REJOUER = ['A8','B2','B14','H1','H15','N2','N14','O8'];
+const CASES_DOUBLE  = ['D8','E5','E11','H4','H12','K5','K11','L8'];
+const CASES_TRIPLE  = ['B5','B11','E2','E14','K2','K14','N5','N11'];
+const CASE_CENTRE   = 'H8';
+
+function toCoords(code) {
+  const row = code.charCodeAt(0) - 65; // A=0
+  const col = parseInt(code.slice(1)) - 1; // 1=0
+  return [row, col];
 }
 
-function buildSpecialCases() {
-  const m = {};
-  const rejouer = ['A8','B2','B14','H1','H15','N2','N14','O8'];
-  const doubles = ['D8','E5','E11','H4','H12','K5','K11','L8'];
-  const triples = ['B5','B11','E2','E14','K2','K14','N5','N11'];
-  const centre  = ['H8'];
-
-  function parse(str) {
-    const row = letterToRow(str[0]);
-    const col = parseInt(str.slice(1)) - 1;
-    return `${row},${col}`;
-  }
-
-  rejouer.forEach(s => { m[parse(s)] = 'R'; });
-  doubles.forEach(s => { m[parse(s)] = 'D'; });
-  triples.forEach(s => { m[parse(s)] = 'T'; });
-  centre.forEach(s  => { m[parse(s)] = 'C'; });
-  return m;
-}
-
-const SPECIAL_CASES = buildSpecialCases();
+[...CASES_REJOUER, ...CASES_DOUBLE, ...CASES_TRIPLE, CASE_CENTRE].forEach(c => {
+  const [r, col] = toCoords(c);
+  if (CASES_REJOUER.includes(c)) SPECIAL_CASES[`${r},${col}`] = 'R';
+  else if (CASES_DOUBLE.includes(c)) SPECIAL_CASES[`${r},${col}`] = 'D';
+  else if (CASES_TRIPLE.includes(c)) SPECIAL_CASES[`${r},${col}`] = 'T';
+  else if (c === CASE_CENTRE) SPECIAL_CASES[`${r},${col}`] = 'C';
+});
 
 let G = null;
+let logMode = 'detailed'; // 'detailed' ou 'compact'
+let selectedTokenIdx = null;
+let jokerCallback = null;
+let echangeSelection = [];
 
-// ---------- CRÉATION DE PARTIE ----------
-
-function createGame(players) {
+function initGame(players) {
   const sac = [];
-  for (const [val, qty] of Object.entries(DISTRIBUTION)) {
-    for (let i = 0; i < qty; i++) {
-      sac.push({ val: parseInt(val), isJoker: false });
-    }
-  }
-  sac.push({ val: null, isJoker: true, jokerVal: null });
-  sac.push({ val: null, isJoker: true, jokerVal: null });
+  Object.entries(DISTRIBUTION).forEach(([v,q]) => {
+    for(let i=0;i<q;i++) sac.push({val: parseInt(v), isJoker: false});
+  });
+  sac.push({val:null, isJoker:true, jokerVal:null});
+  sac.push({val:null, isJoker:true, jokerVal:null});
+  
   shuffle(sac);
-  sac.splice(0, 3);
-
-  const joueurs = players.map((name, i) => ({
-    name, score: 0, hand: [], isIA: i > 0
+  sac.splice(0,3); // Retirer 3
+  
+  const joueurs = players.map((name,i) => ({
+    name, 
+    score: 0, 
+    hand: draw(sac, 3),
+    isAI: i>0
   }));
-  joueurs.forEach(j => { j.hand = drawTokens(sac, 3); });
-
+  
   return {
-    board: Array.from({ length: 15 }, () => Array(15).fill(null)),
+    board: Array(15).fill(null).map(() => Array(15).fill(null)),
     sac,
     joueurs,
-    currentPlayerIndex: 0,
+    current: 0,
     firstMove: true,
-    usedSpecials: new Set(),
-    // pending : jetons en cours de placement
-    // { tokenIndex, r, c, val, isJoker, jokerVal }
-    pending: [],
-    selectedTokenIndex: null,
-    gameOver: false,
-    rejouerFlag: false
+    usedSpecs: new Set(),
+    pending: [], // {idx, r, c, val, isJoker, jokerVal}
+    over: false
   };
 }
 
-// ---------- UTILITAIRES ----------
-
-function shuffle(arr) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
-function drawTokens(sac, n) {
-  const drawn = [];
-  for (let i = 0; i < n && sac.length > 0; i++) drawn.push(sac.pop());
-  return drawn;
-}
-
-function getSpecialType(r, c) {
-  const key = `${r},${c}`;
-  if (G.usedSpecials.has(key)) return null;
-  return SPECIAL_CASES[key] || null;
-}
-
-function effectiveVal(t) {
-  if (!t) return null;
-  return t.isJoker ? t.jokerVal : t.val;
-}
-
-// ---------- LOGIQUE PLATEAU ----------
-
-function boardWithPending() {
-  const b = G.board.map(row => row.map(c => c ? { ...c } : null));
-  for (const p of G.pending) {
-    b[p.r][p.c] = { val: p.val, isJoker: p.isJoker, jokerVal: p.jokerVal };
-  }
-  return b;
-}
-
-function getLine(board, r, c, dr, dc) {
-  let sr = r, sc = c;
-  while (
-    sr - dr >= 0 && sr - dr < 15 &&
-    sc - dc >= 0 && sc - dc < 15 &&
-    board[sr - dr][sc - dc] !== null
-  ) { sr -= dr; sc -= dc; }
-
-  const line = [];
-  let cr = sr, cc = sc;
-  while (cr >= 0 && cr < 15 && cc >= 0 && cc < 15 && board[cr][cc] !== null) {
-    line.push({ r: cr, c: cc, token: board[cr][cc] });
-    cr += dr; cc += dc;
-  }
-  return line;
-}
-
-function getAffectedLines() {
-  const vBoard = boardWithPending();
-  const lines  = [];
-  const seen   = new Set();
-
-  for (const p of G.pending) {
-    const hKey = `H${p.r}`;
-    if (!seen.has(hKey)) {
-      seen.add(hKey);
-      const l = getLine(vBoard, p.r, p.c, 0, 1);
-      if (l.length >= 2) lines.push(l);
-    }
-    const vKey = `V${p.c}`;
-    if (!seen.has(vKey)) {
-      seen.add(vKey);
-      const l = getLine(vBoard, p.r, p.c, 1, 0);
-      if (l.length >= 2) lines.push(l);
-    }
-  }
-  return lines;
-}
-
-function isAdjacentToExisting(r, c) {
-  for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
-    const nr = r + dr, nc = c + dc;
-    if (nr >= 0 && nr < 15 && nc >= 0 && nc < 15 && G.board[nr][nc] !== null)
-      return true;
-  }
-  return false;
-}
-
-// ── CORRECTION 1 : carré interdit UNIQUEMENT au premier tour ──
-function wouldCreate2x2AtFirstMove(board) {
-  if (!G.firstMove) return false; // ignoré après le 1er tour
-  for (let r = 0; r < 14; r++) {
-    for (let c = 0; c < 14; c++) {
-      if (board[r][c] && board[r+1][c] && board[r][c+1] && board[r+1][c+1]) {
-        const pendingInSquare = G.pending.some(p =>
-          (p.r === r || p.r === r+1) && (p.c === c || p.c === c+1)
-        );
-        if (pendingInSquare) return true;
-      }
-    }
-  }
-  return false;
-}
+function shuffle(a) { for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} }
+function draw(sac, n) { return sac.splice(-n, n); }
+function getSpec(r,c) { const k=`${r},${c}`; if(G.usedSpecs.has(k))return null; return SPECIAL_CASES[k]||null; }
 
 // ---------- VALIDATION ----------
 
-function validatePlacement() {
-  if (G.pending.length === 0) return { ok: false, msg: 'Aucun jeton à placer.' };
-  if (G.pending.length > 3)   return { ok: false, msg: 'Maximum 3 jetons par tour.' };
-
-  for (const p of G.pending) {
-    if (p.isJoker && p.jokerVal === null)
-      return { ok: false, msg: 'Définissez la valeur du joker.' };
+function isAdj(r,c) {
+  for(const[dr,dc]of[[-1,0],[1,0],[0,-1],[0,1]]){
+    const[nr,nc]=[r+dr,c+dc];
+    if(nr>=0&&nr<15&&nc>=0&&nc<15&&G.board[nr][nc])return true;
   }
-
-  const rows = [...new Set(G.pending.map(p => p.r))];
-  const cols = [...new Set(G.pending.map(p => p.c))];
-  if (rows.length > 1 && cols.length > 1)
-    return { ok: false, msg: 'Les jetons doivent être sur la même ligne ou colonne.' };
-
-  if (G.firstMove) {
-    if (!G.pending.some(p => p.r === 7 && p.c === 7))
-      return { ok: false, msg: 'Le premier jeton doit couvrir la case centrale H8.' };
-  } else {
-    if (!G.pending.some(p => isAdjacentToExisting(p.r, p.c)))
-      return { ok: false, msg: 'Les jetons doivent être adjacents à un jeton déjà posé.' };
-  }
-
-  const vBoard = boardWithPending();
-  const lines  = getAffectedLines();
-
-  for (const line of lines) {
-    if (line.length > 3)
-      return { ok: false, msg: 'Maximum 3 jetons côte à côte.' };
-    const vals = line.map(l => effectiveVal(l.token));
-    if (vals.some(v => v === null))
-      return { ok: false, msg: 'La valeur du joker doit être définie.' };
-    const sum = vals.reduce((a, b) => a + b, 0);
-    if (line.length === 2 && sum > 15)
-      return { ok: false, msg: `2 jetons : total ${sum} > 15.` };
-    if (line.length === 3 && sum !== 15)
-      return { ok: false, msg: `3 jetons : total ${sum} ≠ 15 (doit faire exactement 15).` };
-  }
-
-  // Carré interdit seulement au 1er tour
-  if (wouldCreate2x2AtFirstMove(vBoard))
-    return { ok: false, msg: 'Interdit de former un carré au premier tour.' };
-
-  if (G.pending.filter(p => p.isJoker).length >= 2)
-    return { ok: false, msg: 'Interdit de poser 2 jokers au même tour.' };
-
-  return { ok: true };
+  return false;
 }
 
-// ---------- CALCUL DES POINTS ----------
-
-function calculateScore() {
-  let total = 0;
-  const lines    = getAffectedLines();
-  const hasJoker = G.pending.some(p => p.isJoker);
-
-  // ── CORRECTION 2 : détection Triolet ──
-  // Triolet = les 3 jetons du chevalet posés EN UNE SEULE FOIS
-  // formant EUX-MÊMES un Trio (les 3 pending sont dans la même ligne)
-  let isTriolet = false;
-  if (G.pending.length === 3 && !hasJoker) {
-    // Vérifier que les 3 pending sont tous dans la même ligne affectée
-    for (const line of lines) {
-      const allPendingInLine = G.pending.every(p =>
-        line.some(l => l.r === p.r && l.c === p.c)
-      );
-      if (allPendingInLine && line.length === 3) {
-        const vals = line.map(l => effectiveVal(l.token));
-        const sum  = vals.reduce((a, b) => a + b, 0);
-        if (sum === 15) { isTriolet = true; break; }
+function validate() {
+  if(G.pending.length===0)return{ok:false,msg:'Aucun jeton'};
+  if(G.pending.length>3)return{ok:false,msg:'Max 3 jetons'};
+  
+  const rows=[...new Set(G.pending.map(p=>p.r))];
+  const cols=[...new Set(G.pending.map(p=>p.c))];
+  if(rows.length>1&&cols.length>1)return{ok:false,msg:'Alignement requis'};
+  
+  if(G.firstMove){
+    if(!G.pending.some(p=>p.r===7&&p.c===7))return{ok:false,msg:'Commencer sur H8'};
+  }else{
+    if(!G.pending.some(p=>isAdj(p.r,p.c)))return{ok:false,msg:'Adjacence requise'};
+  }
+  
+  // Vérifier lignes
+  const b=G.board.map(r=>[...r]);
+  G.pending.forEach(p=>b[p.r][p.c]={val:p.val,isJoker:p.isJoker,jokerVal:p.jokerVal});
+  
+  for(const p of G.pending){
+    // Horiz
+    let line=[p];
+    let c=p.c-1; while(c>=0&&b[p.r][c])line.unshift({r:p.r,c:c,token:b[p.r][c--]});
+    c=p.c+1; while(c<15&&b[p.r][c])line.push({r:p.r,c:c,token:b[p.r][c++]});
+    if(line.length>3)return{ok:false,msg:'Max 3 alignés'};
+    if(line.length>=2){
+      const vals=line.map(x=>x.token.isJoker?x.token.jokerVal:x.token.val);
+      if(vals.some(v=>v===null))return{ok:false,msg:'Joker sans valeur'};
+      const sum=vals.reduce((a,b)=>a+b,0);
+      if(line.length===2&&sum>15)return{ok:false,msg:'Paire >15'};
+      if(line.length===3&&sum!==15)return{ok:false,msg:'Trio !=15'};
+    }
+    // Vert
+    line=[p];
+    let r=p.r-1; while(r>=0&&b[r][p.c])line.unshift({r:r,c:p.c,token:b[r--][p.c]});
+    r=p.r+1; while(r<15&&b[r][p.c])line.push({r:r,c:p.c,token:b[r++][p.c]});
+    if(line.length>3)return{ok:false,msg:'Max 3 alignés'};
+    if(line.length>=2){
+      const vals=line.map(x=>x.token.isJoker?x.token.jokerVal:x.token.val);
+      if(vals.some(v=>v===null))return{ok:false,msg:'Joker sans valeur'};
+      const sum=vals.reduce((a,b)=>a+b,0);
+      if(line.length===2&&sum>15)return{ok:false,msg:'Paire >15'};
+      if(line.length===3&&sum!==15)return{ok:false,msg:'Trio !=15'};
+    }
+  }
+  
+  // Carré interdit uniquement 1er tour
+  if(G.firstMove){
+    for(let r=0;r<14;r++)for(let c=0;c<14;c++){
+      if(b[r][c]&&b[r+1][c]&&b[r][c+1]&&b[r+1][c+1]){
+        if(G.pending.some(p=>(p.r===r||p.r===r+1)&&(p.c===c||p.c===c+1)))
+          return{ok:false,msg:'Pas de carré au 1er tour'};
       }
     }
   }
+  
+  if(G.pending.filter(p=>p.isJoker).length>=2)return{ok:false,msg:'Un seul joker/tour'};
+  
+  return{ok:true};
+}
 
-  let trioletBonus = isTriolet ? 50 : 0;
-  let trioletApplied = false;
+// ---------- SCORE ----------
 
-  for (const line of lines) {
-    const vals = line.map(l => effectiveVal(l.token));
-    const sum  = vals.reduce((a, b) => a + b, 0);
-
-    // Case spéciale sur un jeton pending de cette ligne
-    let multiplier     = 1;
-    let specialUsedKey = null;
-
-    for (const p of G.pending) {
-      if (!line.some(l => l.r === p.r && l.c === p.c)) continue;
-      const sp = getSpecialType(p.r, p.c);
-      if (sp === 'D' || sp === 'C') {
-        multiplier = 2; specialUsedKey = `${p.r},${p.c}`; break;
+function calcScore() {
+  let total=0;
+  const b=G.board.map(r=>[...r]);
+  G.pending.forEach(p=>b[p.r][p.c]={val:p.val,isJoker:p.isJoker,jokerVal:p.jokerVal});
+  
+  // Détection Triolet (3 jetons posés en une fois formant un trio)
+  let isTriolet=false;
+  if(G.pending.length===3&&!G.pending.some(p=>p.isJoker)){
+    // Vérifier si les 3 sont sur une même ligne et font 15
+    const rows=[...new Set(G.pending.map(p=>p.r))];
+    const cols=[...new Set(G.pending.map(p=>p.c))];
+    if(rows.length===1){
+      const r=rows[0];
+      const sorted=G.pending.sort((a,b)=>a.c-b.c);
+      if(sorted[2].c-sorted[0].c===2){ // consécutifs
+        const sum=sorted.reduce((a,p)=>a+(p.isJoker?p.jokerVal:p.val),0);
+        if(sum===15)isTriolet=true;
       }
-      if (sp === 'T') {
-        multiplier = 3; specialUsedKey = `${p.r},${p.c}`; break;
+    }else if(cols.length===1){
+      const c=cols[0];
+      const sorted=G.pending.sort((a,b)=>a.r-b.r);
+      if(sorted[2].r-sorted[0].r===2){
+        const sum=sorted.reduce((a,p)=>a+(p.isJoker?p.jokerVal:p.val),0);
+        if(sum===15)isTriolet=true;
       }
-    }
-
-    if (line.length === 3 && sum === 15) {
-      let pts = 30 * multiplier;
-
-      // Ajouter le bonus Triolet UNE SEULE FOIS sur la ligne triolet
-      if (isTriolet && !trioletApplied) {
-        const allPendingInLine = G.pending.every(p =>
-          line.some(l => l.r === p.r && l.c === p.c)
-        );
-        if (allPendingInLine) {
-          pts += trioletBonus;
-          trioletApplied = true;
-          log(`🎉 TRIOLET ! Trio×${multiplier}=${30*multiplier} + bonus 50 = ${pts} pts`, 'good');
-        } else {
-          log(`✅ Trio = 30×${multiplier} = ${30*multiplier} pts`, 'good');
-        }
-      } else {
-        log(`✅ Trio = 30×${multiplier} = ${30*multiplier} pts`, 'good');
-      }
-
-      if (specialUsedKey) G.usedSpecials.add(specialUsedKey);
-      total += pts;
-
-    } else if (line.length === 2) {
-      let pts = 0;
-      for (const item of line) {
-        const isNew = G.pending.some(p => p.r === item.r && p.c === item.c);
-        const v     = effectiveVal(item.token);
-        if (isNew) {
-          const sp = getSpecialType(item.r, item.c);
-          if (sp === 'D' || sp === 'C') {
-            pts += v * 2; G.usedSpecials.add(`${item.r},${item.c}`);
-          } else if (sp === 'T') {
-            pts += v * 3; G.usedSpecials.add(`${item.r},${item.c}`);
-          } else {
-            pts += v;
-          }
-        } else {
-          pts += v;
-        }
-      }
-      log(`➕ Paire = ${pts} pts`, 'info');
-      total += pts;
     }
   }
-
-  // Case Rejouer
-  for (const p of G.pending) {
-    if (getSpecialType(p.r, p.c) === 'R') {
-      G.rejouerFlag = true;
-      G.usedSpecials.add(`${p.r},${p.c}`);
-      log('🔁 Case Rejouer !', 'good');
-      break;
+  
+  const lines=new Set();
+  G.pending.forEach(p=>{
+    // Ligne horiz
+    let h=[{r:p.r,c:p.c}];
+    let c=p.c-1; while(c>=0&&b[p.r][c])h.unshift({r:p.r,c:c--});
+    c=p.c+1; while(c<15&&b[p.r][c])h.push({r:p.r,c:c++});
+    if(h.length>=2)lines.add(JSON.stringify(h.sort((a,b)=>a.c-b.c)));
+    // Ligne vert
+    let v=[{r:p.r,c:p.c}];
+    let r=p.r-1; while(r>=0&&b[r][p.c])v.unshift({r:r--,c:p.c});
+    r=p.r+1; while(r<15&&b[r][p.c])v.push({r:r++,c:p.c});
+    if(v.length>=2)lines.add(JSON.stringify(v.sort((a,b)=>a.r-b.r)));
+  });
+  
+  lines.forEach(json=>{
+    const line=JSON.parse(json);
+    const tokens=line.map(p=>b[p.r][p.c]);
+    const vals=tokens.map(t=>t.isJoker?t.jokerVal:t.val);
+    const sum=vals.reduce((a,b)=>a+b,0);
+    const len=line.length;
+    
+    // Multiplicateur case spéciale
+    let mult=1;
+    line.forEach(pos=>{
+      if(G.pending.some(p=>p.r===pos.r&&p.c===pos.c)){
+        const sp=getSpec(pos.r,pos.c);
+        if(sp==='D'||sp==='C'){mult=2;G.usedSpecs.add(`${pos.r},${pos.c}`);}
+        if(sp==='T'){mult=3;G.usedSpecs.add(`${pos.r},${pos.c}`);}
+      }
+    });
+    
+    if(len===3&&sum===15){
+      let pts=30*mult;
+      let txt=`Trio×${mult}=${pts}`;
+      if(isTriolet&&line.every(pos=>G.pending.some(p=>p.r===pos.r&&p.c===pos.c))){
+        pts+=50;
+        txt+=` +50 Triolet!`;
+      }
+      total+=pts;
+      log(txt, 'points');
+    }else if(len===2){
+      let pts=0;
+      line.forEach(pos=>{
+        const t=b[pos.r][pos.c];
+        const v=t.isJoker?t.jokerVal:t.val;
+        if(G.pending.some(p=>p.r===pos.r&&p.c===pos.c)){
+          const sp=getSpec(pos.r,pos.c);
+          if(sp==='D'||sp==='C'){pts+=v*2;G.usedSpecs.add(`${pos.r},${pos.c}`);}
+          else if(sp==='T'){pts+=v*3;G.usedSpecs.add(`${pos.r},${pos.c}`);}
+          else pts+=v;
+        }else pts+=v;
+      });
+      total+=pts;
+      log(`Paire=${pts}`, 'info');
     }
-  }
-
+  });
+  
+  // Rejouer
+  G.pending.forEach(p=>{
+    if(getSpec(p.r,p.c)==='R'){
+      G.usedSpecs.add(`${p.r},${p.c}`);
+      G.rejouer=true;
+      log('Rejouer!', 'good');
+    }
+  });
+  
   return total;
 }
 
 // ---------- ACTIONS ----------
 
-function confirmMove() {
-  const check = validatePlacement();
-  if (!check.ok) { log('❌ ' + check.msg, 'bad'); return; }
-
-  const pts    = calculateScore();
-  const player = G.joueurs[G.currentPlayerIndex];
-  player.score += pts;
-  log(`${player.name} marque ${pts} pts → Total : ${player.score}`, 'good');
-
-  // Fixer les jetons sur le plateau
-  for (const p of G.pending) {
-    G.board[p.r][p.c] = {
-      val: p.val, isJoker: p.isJoker, jokerVal: p.jokerVal
-    };
-  }
-
+function playTurn() {
+  const v=validate();
+  if(!v.ok){log(v.msg,'bad');return;}
+  
+  const pts=calcScore();
+  const p=G.joueurs[G.current];
+  p.score+=pts;
+  log(`${p.name}: +${pts} pts (Total:${p.score})`, 'good');
+  
+  // Fixer jetons
+  G.pending.forEach(x=>{
+    G.board[x.r][x.c]={val:x.val,isJoker:x.isJoker,jokerVal:x.jokerVal};
+  });
+  
   // Retirer de la main (indices décroissants)
-  const sortedIdx = [...G.pending]
-    .sort((a, b) => b.tokenIndex - a.tokenIndex)
-    .map(p => p.tokenIndex);
-  sortedIdx.forEach(i => player.hand.splice(i, 1));
-
-  // Repioche exactement le nombre posé
-  const drawn = drawTokens(G.sac, G.pending.length);
-  player.hand.push(...drawn);
-
-  G.pending            = [];
-  G.selectedTokenIndex = null;
-  G.firstMove          = false;
-
-  if (checkEndGame()) return;
-
-  if (G.rejouerFlag) {
-    G.rejouerFlag = false;
+  const idxs=[...new Set(G.pending.map(p=>p.idx))].sort((a,b)=>b-a);
+  idxs.forEach(i=>p.hand.splice(i,1));
+  
+  // Repiocher
+  p.hand.push(...draw(G.sac, G.pending.length));
+  
+  G.pending=[];
+  selectedTokenIdx=null;
+  G.firstMove=false;
+  
+  if(checkEnd())return;
+  
+  if(G.rejouer){
+    G.rejouer=false;
     render();
-    return;
+    if(G.joueurs[G.current].isAI)setTimeout(aiPlay,800);
+  }else{
+    nextTurn();
   }
-
-  nextPlayer();
 }
 
-function cancelMove() {
-  G.pending            = [];
-  G.selectedTokenIndex = null;
+function nextTurn() {
+  G.current=(G.current+1)%G.joueurs.length;
   render();
+  if(G.joueurs[G.current].isAI)setTimeout(aiPlay,1000);
 }
 
-function nextPlayer() {
-  G.currentPlayerIndex = (G.currentPlayerIndex + 1) % G.joueurs.length;
-  render();
-  if (G.joueurs[G.currentPlayerIndex].isIA) setTimeout(iaPlay, 900);
-}
-
-function checkEndGame() {
-  const player = G.joueurs[G.currentPlayerIndex];
-  if (G.sac.length === 0 && player.hand.length === 0) {
-    let bonus = 0;
-    G.joueurs.forEach((j, i) => {
-      if (i !== G.currentPlayerIndex) {
-        const sum = j.hand.reduce((a, t) => a + (effectiveVal(t) || 0), 0);
-        bonus += sum;
-        log(`${j.name} perd ${sum} pts (jetons restants)`, 'bad');
+function checkEnd() {
+  const p=G.joueurs[G.current];
+  if(G.sac.length===0&&p.hand.length===0){
+    // Bonus fin
+    let bonus=0;
+    G.joueurs.forEach((j,i)=>{
+      if(i!==G.current){
+        const s=j.hand.reduce((a,t)=>a+(t.isJoker?0:t.val),0);
+        bonus+=s;
       }
     });
-    player.score += bonus;
-    G.gameOver = true;
-    setTimeout(showFinModal, 600);
+    p.score+=bonus;
+    showEnd();
     return true;
   }
   return false;
 }
 
-function showFinModal() {
-  const sorted = [...G.joueurs].sort((a, b) => b.score - a.score);
-  document.getElementById('fin-winner').textContent = `🥇 ${sorted[0].name} gagne !`;
-  document.getElementById('fin-scores').innerHTML = sorted.map((j, i) =>
-    `<div>${['🥇','🥈','🥉','4️⃣'][i]} ${j.name} : ${j.score} pts</div>`
-  ).join('');
+function showEnd() {
+  const sorted=[...G.joueurs].sort((a,b)=>b.score-a.score);
+  const html=sorted.map((j,i)=>`
+    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #334155;">
+      <span>${['🥇','🥈','🥉','4️⃣'][i]} ${j.name}</span>
+      <span style="font-weight:800;color:#fbbf24;">${j.score}</span>
+    </div>
+  `).join('');
+  document.getElementById('final-scores').innerHTML=html;
   document.getElementById('modal-fin').classList.add('active');
 }
 
 // ---------- IA ----------
 
-function iaPlay() {
-  const player = G.joueurs[G.currentPlayerIndex];
-  if (player.hand.length === 0) { nextPlayer(); return; }
-
-  let bestMove = null;
-  let bestPts  = -1;
-
-  for (let hi = 0; hi < player.hand.length; hi++) {
-    const token = player.hand[hi];
-    for (let r = 0; r < 15; r++) {
-      for (let c = 0; c < 15; c++) {
-        if (G.board[r][c] !== null) continue;
-        if (G.firstMove && !(r === 7 && c === 7)) continue;
-        if (!G.firstMove && !isAdjacentToExisting(r, c)) continue;
-
-        G.pending = [{
-          tokenIndex: hi, r, c,
-          val: token.val, isJoker: token.isJoker,
-          jokerVal: token.isJoker ? 7 : null
-        }];
-
-        if (validatePlacement().ok) {
-          const pts = calculateScore();
-          if (pts > bestPts) { bestPts = pts; bestMove = { hi, r, c, token }; }
-        }
-        G.pending = [];
+function aiPlay() {
+  const p=G.joueurs[G.current];
+  if(p.hand.length===0){nextTurn();return;}
+  
+  let best=null, bestPts=-1;
+  
+  for(let i=0;i<p.hand.length;i++){
+    const t=p.hand[i];
+    for(let r=0;r<15;r++)for(let c=0;c<15;c++){
+      if(G.board[r][c])continue;
+      if(G.firstMove&&!(r===7&&c===7))continue;
+      if(!G.firstMove&&!isAdj(r,c))continue;
+      
+      G.pending=[{idx:i,r,c,val:t.val,isJoker:t.isJoker,jokerVal:t.isJoker?7:t.jokerVal}];
+      if(validate().ok){
+        const pts=calcScore();
+        if(pts>bestPts){bestPts=pts;best={i,r,c,val:t.val,isJoker:t.isJoker};}
       }
+      G.pending=[];
     }
   }
-
-  if (bestMove) {
-    const { hi, r, c, token } = bestMove;
-    G.pending = [{
-      tokenIndex: hi, r, c,
-      val: token.val, isJoker: token.isJoker,
-      jokerVal: token.isJoker ? 7 : null
-    }];
-    const pts = calculateScore();
-    player.score += pts;
-    G.board[r][c] = { val: token.val, isJoker: token.isJoker, jokerVal: token.isJoker ? 7 : null };
-    player.hand.splice(hi, 1);
-    player.hand.push(...drawTokens(G.sac, 1));
-    log(`🤖 ${player.name} joue ${token.isJoker ? 'X' : token.val} en ${String.fromCharCode(65+r)}${c+1} → ${pts} pts`, 'info');
-    G.pending   = [];
-    G.firstMove = false;
-    if (!checkEndGame()) nextPlayer();
-  } else {
-    if (G.sac.length >= 5) {
-      const t = player.hand.pop();
-      G.sac.push(t); shuffle(G.sac);
-      player.hand.push(...drawTokens(G.sac, 1));
-      log(`🤖 ${player.name} échange.`, 'info');
-    } else {
-      log(`🤖 ${player.name} passe.`, 'info');
+  
+  if(best){
+    const t=p.hand[best.i];
+    G.board[best.r][best.c]={val:best.val,isJoker:best.isJoker,jokerVal:best.isJoker?7:null};
+    p.hand.splice(best.i,1);
+    p.hand.push(...draw(G.sac,1));
+    p.score+=bestPts;
+    log(`🤖 ${p.name}: +${bestPts} pts`, 'info');
+    G.firstMove=false;
+    if(!checkEnd())nextTurn();
+  }else{
+    if(G.sac.length>=5&&p.hand.length>0){
+      const t=p.hand.pop();
+      G.sac.push(t);shuffle(G.sac);
+      p.hand.push(...draw(G.sac,1));
+      log(`🤖 ${p.name} échange`, 'info');
+    }else{
+      log(`🤖 ${p.name} passe`, 'info');
     }
-    nextPlayer();
+    nextTurn();
   }
 }
 
@@ -474,385 +361,289 @@ function iaPlay() {
 
 function render() {
   renderBoard();
+  renderHand();
   renderScores();
-  renderChevalet();
-  renderPending();
-  document.getElementById('sac-count').textContent = G.sac.length;
-  const p = G.joueurs[G.currentPlayerIndex];
-  document.getElementById('current-player-name').textContent =
-    (p.isIA ? '🤖 ' : '👤 ') + p.name;
+  document.getElementById('sac-count').textContent=G.sac.length;
 }
 
 function renderBoard() {
-  const boardEl = document.getElementById('board');
-  boardEl.innerHTML = '';
-
-  for (let r = 0; r < 15; r++) {
-    for (let c = 0; c < 15; c++) {
-      const cell = document.createElement('div');
-      cell.className = 'cell';
-
-      const sp   = SPECIAL_CASES[`${r},${c}`];
-      const used = G.usedSpecials.has(`${r},${c}`);
-
-      if (!used) {
-        if (sp === 'R') cell.classList.add('rejouer');
-        if (sp === 'D') cell.classList.add('double');
-        if (sp === 'T') cell.classList.add('triple');
-        if (sp === 'C') cell.classList.add('center');
-      }
-
-      // Jeton fixé sur le plateau
-      if (G.board[r][c]) {
-        const t   = G.board[r][c];
-        const tok = createTokenEl(t, false);
-        cell.appendChild(tok);
-
-      // Jeton pending sur cette case
-      } else {
-        const pend = G.pending.find(p => p.r === r && p.c === c);
-        if (pend) {
-          const tok = createTokenEl(
-            { val: pend.val, isJoker: pend.isJoker, jokerVal: pend.jokerVal },
-            true // c'est un pending
-          );
-          cell.appendChild(tok);
-          // Clic sur le jeton pending → le récupérer
-          tok.addEventListener('click', (e) => {
-            e.stopPropagation();
-            removePendingByPos(r, c);
-          });
-
-        } else {
-          // Case vide : label spéciale
-          if (!used && sp) {
-            const lbl = document.createElement('span');
-            lbl.className = 'cell-label';
-            lbl.textContent =
-              sp === 'R' ? '↺' :
-              (sp === 'D' || sp === 'C') ? '×2' : '×3';
-            cell.appendChild(lbl);
-          }
-
-          // Surbrillance si jeton sélectionné
-          if (G.selectedTokenIndex !== null) {
-            if (G.firstMove) {
-              if (r === 7 && c === 7) cell.classList.add('highlight');
-            } else {
-              if (isAdjacentToExisting(r, c)) cell.classList.add('highlight');
-            }
+  const b=document.getElementById('board');
+  b.innerHTML='';
+  
+  // Coords
+  const cols=document.getElementById('coord-cols');
+  const rows=document.getElementById('coord-rows');
+  if(!cols.innerHTML){
+    for(let i=1;i<=15;i++){
+      const s=document.createElement('span');
+      s.className='coord-col';
+      s.textContent=i;
+      cols.appendChild(s);
+    }
+    for(let i=0;i<15;i++){
+      const s=document.createElement('span');
+      s.textContent=String.fromCharCode(65+i);
+      rows.appendChild(s);
+    }
+  }
+  
+  for(let r=0;r<15;r++)for(let c=0;c<15;c++){
+    const cell=document.createElement('div');
+    cell.className='cell';
+    const sp=getSpec(r,c);
+    if(sp==='R')cell.classList.add('rejouer');
+    if(sp==='D')cell.classList.add('double');
+    if(sp==='T')cell.classList.add('triple');
+    if(sp==='C')cell.classList.add('center');
+    
+    // Jeton fixé
+    if(G.board[r][c]){
+      cell.appendChild(createToken(G.board[r][c],false));
+      cell.classList.add('occupied');
+    }else{
+      // Pending?
+      const pend=G.pending.find(p=>p.r===r&&p.c===c);
+      if(pend){
+        cell.appendChild(createToken({val:pend.val,isJoker:pend.isJoker,jokerVal:pend.jokerVal},true));
+        cell.onclick=()=>removePending(r,c);
+      }else{
+        // Label case spéciale vide
+        if(sp){
+          const l=document.createElement('span');
+          l.className='cell-label';
+          l.textContent=sp==='R'?'↺':(sp==='D'||sp==='C')?'×2':'×3';
+          cell.appendChild(l);
+        }
+        // Highlight si sélection
+        if(selectedTokenIdx!==null){
+          if(G.firstMove){
+            if(r===7&&c===7)cell.classList.add('highlight');
+          }else{
+            if(isAdj(r,c))cell.classList.add('highlight');
           }
         }
+        cell.onclick=()=>placeToken(r,c);
       }
-
-      cell.addEventListener('click', () => onCellClick(r, c));
-      boardEl.appendChild(cell);
     }
+    b.appendChild(cell);
   }
 }
 
-// ── CORRECTION 3 : valeur du joker dans l'angle ──
-// ── CORRECTION 4 : createTokenEl unifié ──
-function createTokenEl(t, isPending) {
-  const tok = document.createElement('div');
-  tok.className = 'token' + (t.isJoker ? ' joker-token' : '') + (isPending ? ' token-pending' : '');
-
-  if (t.isJoker) {
-    // Lettre X grande
-    const main = document.createElement('span');
-    main.className = 'token-main';
-    main.textContent = 'X';
-    tok.appendChild(main);
-
-    // ── Valeur du joker dans l'angle bas-droit ──
-    if (t.jokerVal !== null && t.jokerVal !== undefined) {
-      const corner = document.createElement('span');
-      corner.className = 'token-corner';
-      corner.textContent = t.jokerVal;
-      tok.appendChild(corner);
+function createToken(t,isPending){
+  const div=document.createElement('div');
+  div.className='token'+(t.isJoker?' joker':'')+(isPending?' pending-token':'');
+  if(t.isJoker){
+    const main=document.createElement('span');
+    main.textContent='X';
+    div.appendChild(main);
+    if(t.jokerVal!==null){
+      const cor=document.createElement('span');
+      cor.className='corner-val';
+      cor.textContent=t.jokerVal;
+      div.appendChild(cor);
     }
-  } else {
-    const main = document.createElement('span');
-    main.className = 'token-main';
-    main.textContent = t.val;
-    tok.appendChild(main);
+  }else{
+    div.textContent=t.val;
   }
-
-  if (isPending) tok.title = 'Cliquez pour récupérer ce jeton';
-  return tok;
+  return div;
 }
 
-// ── CORRECTION 4 : chevalet sans les jetons déjà placés ──
-function renderChevalet() {
-  const player = G.joueurs[0];
-  const cont   = document.getElementById('chevalet');
-  cont.innerHTML = '';
-
-  // Indices des jetons déjà dans pending
-  const pendingIndices = new Set(G.pending.map(p => p.tokenIndex));
-
-  player.hand.forEach((t, i) => {
-    if (pendingIndices.has(i)) return; // ← ne pas afficher si déjà posé
-
-    const div = document.createElement('div');
-    div.className = 'hand-token' + (t.isJoker ? ' joker' : '');
-    if (G.selectedTokenIndex === i) div.classList.add('selected');
-
-    if (t.isJoker) {
-      const main = document.createElement('span');
-      main.className = 'token-main';
-      main.textContent = 'X';
-      div.appendChild(main);
-    } else {
-      div.textContent = t.val;
+function renderHand() {
+  const container=document.getElementById('hand-tokens');
+  container.innerHTML='';
+  const p=G.joueurs[0];
+  
+  // Indices utilisés dans pending
+  const used=new Set(G.pending.map(x=>x.idx));
+  
+  for(let i=0;i<3;i++){
+    if(i<p.hand.length&&!used.has(i)){
+      const t=p.hand[i];
+      const div=document.createElement('div');
+      div.className='hand-token'+(t.isJoker?' joker':'')+(selectedTokenIdx===i?' selected':'');
+      div.textContent=t.isJoker?'X':t.val;
+      div.onclick=()=>selectToken(i);
+      container.appendChild(div);
+    }else if(i>=p.hand.length&&!used.has(i)){
+      const div=document.createElement('div');
+      div.className='hand-token empty-slot';
+      container.appendChild(div);
     }
-
-    div.addEventListener('click', () => onSelectToken(i));
-    cont.appendChild(div);
-  });
-}
-
-function renderPending() {
-  // Le panneau "À placer" reste pour info mais les jetons sont
-  // maintenant visibles directement sur le plateau
-  const cont = document.getElementById('pending-tokens');
-  cont.innerHTML = '';
-  if (G.pending.length === 0) {
-    cont.innerHTML = '<span style="color:#aaa;font-size:0.8rem;">Sélectionnez un jeton puis cliquez sur le plateau</span>';
-    return;
   }
-  G.pending.forEach((p) => {
-    const div = document.createElement('div');
-    div.className = 'pending-token' + (p.isJoker ? ' joker' : '');
-    div.textContent = p.isJoker ? `X(${p.jokerVal ?? '?'})` : p.val;
-    div.title = `En ${String.fromCharCode(65+p.r)}${p.c+1} — cliquez sur le plateau pour récupérer`;
-    cont.appendChild(div);
-  });
 }
 
 function renderScores() {
-  document.getElementById('scores-container').innerHTML =
-    G.joueurs.map(j =>
-      `<div class="score-row">
-        <span>${j.isIA ? '🤖 ' : '👤 '}${j.name}</span>
-        <span class="pts">${j.score}</span>
-      </div>`
-    ).join('');
+  const div=document.getElementById('scores-list');
+  div.innerHTML=G.joueurs.map((j,i)=>`
+    <div class="score-row">
+      <div class="score-name">
+        ${j.isAI?'🤖':'👤'} 
+        <span class="${i===G.current?'current-turn':''}">${j.name}</span>
+        ${i===G.current?'⬅️':''}
+      </div>
+      <div class="score-val">${j.score}</div>
+    </div>
+  `).join('');
 }
 
 // ---------- INTERACTIONS ----------
 
-function onSelectToken(index) {
-  if (G.gameOver) return;
-  if (G.joueurs[G.currentPlayerIndex].isIA) return;
-  if (G.pending.some(p => p.tokenIndex === index)) return;
-  G.selectedTokenIndex = (G.selectedTokenIndex === index) ? null : index;
+function selectToken(idx) {
+  if(G.joueurs[G.current].isAI)return;
+  if(G.pending.some(p=>p.idx===idx))return;
+  selectedTokenIdx=selectedTokenIdx===idx?null:idx;
   render();
 }
 
-function onCellClick(r, c) {
-  if (G.gameOver) return;
-  if (G.joueurs[G.currentPlayerIndex].isIA) return;
-
-  // Si case déjà occupée par un jeton fixé → rien
-  if (G.board[r][c] !== null) return;
-
-  // Si case occupée par un pending → récupérer
-  if (G.pending.some(p => p.r === r && p.c === c)) {
-    removePendingByPos(r, c);
-    return;
+function placeToken(r,c) {
+  if(selectedTokenIdx===null)return;
+  if(G.board[r][c])return;
+  if(G.pending.some(p=>p.r===r&&p.c===c))return;
+  
+  const p=G.joueurs[0];
+  const t=p.hand[selectedTokenIdx];
+  
+  if(t.isJoker){
+    openJokerModal(val=>{
+      G.pending.push({idx:selectedTokenIdx,r,c,val:null,isJoker:true,jokerVal:val});
+      selectedTokenIdx=null;
+      render();
+    });
+  }else{
+    G.pending.push({idx:selectedTokenIdx,r,c,val:t.val,isJoker:false,jokerVal:null});
+    selectedTokenIdx=null;
+    render();
   }
+}
 
-  if (G.selectedTokenIndex === null) return;
-
-  const player = G.joueurs[0];
-  const token  = player.hand[G.selectedTokenIndex];
-
-  if (token.isJoker) {
-    openJokerModal(r, c);
-    return;
+function removePending(r,c) {
+  const i=G.pending.findIndex(p=>p.r===r&&p.c===c);
+  if(i>-1){
+    G.pending.splice(i,1);
+    render();
   }
-
-  G.pending.push({
-    tokenIndex: G.selectedTokenIndex,
-    r, c,
-    val: token.val, isJoker: false, jokerVal: null
-  });
-  G.selectedTokenIndex = null;
-  render();
 }
 
-// ── CORRECTION 4 : récupérer un jeton depuis le plateau ──
-function removePendingByPos(r, c) {
-  const idx = G.pending.findIndex(p => p.r === r && p.c === c);
-  if (idx === -1) return;
-  G.pending.splice(idx, 1);
-  G.selectedTokenIndex = null;
-  render();
-}
+// ---------- MODALS ----------
 
-function removePending(i) {
-  G.pending.splice(i, 1);
-  G.selectedTokenIndex = null;
-  render();
-}
-
-// ---------- MODAL JOKER ----------
-
-let jokerPos = null;
-
-function openJokerModal(r, c) {
-  jokerPos = { r, c };
-  const grid = document.getElementById('joker-grid');
-  grid.innerHTML = '';
-  for (let v = 0; v <= 15; v++) {
-    const div = document.createElement('div');
-    div.className = 'joker-val';
-    div.textContent = v;
-    div.addEventListener('click', () => confirmJokerVal(v));
-    grid.appendChild(div);
+function openJokerModal(callback) {
+  jokerCallback=callback;
+  const grid=document.getElementById('joker-grid');
+  grid.innerHTML='';
+  for(let v=0;v<=15;v++){
+    const d=document.createElement('div');
+    d.className='joker-val';
+    d.textContent=v;
+    d.onclick=()=>{
+      callback(v);
+      closeJokerModal();
+    };
+    grid.appendChild(d);
   }
   document.getElementById('modal-joker').classList.add('active');
 }
 
-function confirmJokerVal(val) {
+function closeJokerModal() {
   document.getElementById('modal-joker').classList.remove('active');
-  if (!jokerPos) return;
-  G.pending.push({
-    tokenIndex: G.selectedTokenIndex,
-    r: jokerPos.r, c: jokerPos.c,
-    val: null, isJoker: true, jokerVal: val
-  });
-  jokerPos             = null;
-  G.selectedTokenIndex = null;
-  render();
+  jokerCallback=null;
 }
 
-document.getElementById('btn-joker-cancel').addEventListener('click', () => {
-  document.getElementById('modal-joker').classList.remove('active');
-  jokerPos = null;
-});
-
-// ---------- MODAL ÉCHANGE ----------
-
-let echangeSelected = [];
-
-function openEchangeModal() {
-  echangeSelected = [];
-  const player = G.joueurs[0];
-  const cont   = document.getElementById('echange-chevalet');
-  cont.innerHTML = '';
-
-  player.hand.forEach((t, i) => {
-    const div = document.createElement('div');
-    div.className = 'hand-token' + (t.isJoker ? ' joker' : '');
-    div.textContent = t.isJoker ? 'X' : t.val;
-    div.style.margin = '4px';
-    div.addEventListener('click', () => {
-      const idx = echangeSelected.indexOf(i);
-      if (idx === -1 && echangeSelected.length < 3) {
-        echangeSelected.push(i);
-        div.classList.add('selected');
-      } else if (idx !== -1) {
-        echangeSelected.splice(idx, 1);
-        div.classList.remove('selected');
+function openEchange() {
+  if(G.joueurs[G.current].isAI)return;
+  if(G.pending.length>0){log('Annulez d\'abord','bad');return;}
+  echangeSelection=[];
+  const p=G.joueurs[0];
+  const list=document.getElementById('echange-list');
+  list.innerHTML='';
+  p.hand.forEach((t,i)=>{
+    const d=document.createElement('div');
+    d.className='hand-token'+(t.isJoker?' joker':'');
+    d.textContent=t.isJoker?'X':t.val;
+    d.onclick=()=>{
+      if(echangeSelection.includes(i)){
+        echangeSelection=echangeSelection.filter(x=>x!==i);
+        d.style.opacity='1';
+        d.style.transform='scale(1)';
+      }else if(echangeSelection.length<3){
+        echangeSelection.push(i);
+        d.style.opacity='0.6';
+        d.style.transform='scale(0.9)';
       }
-    });
-    cont.appendChild(div);
+    };
+    list.appendChild(d);
   });
-
   document.getElementById('modal-echange').classList.add('active');
 }
 
-document.getElementById('btn-echange-confirm').addEventListener('click', () => {
-  if (echangeSelected.length === 0) {
-    log('❌ Sélectionnez au moins un jeton.', 'bad'); return;
-  }
-  if (G.sac.length < 5) {
-    log('❌ Moins de 5 jetons dans le sac : échange impossible.', 'bad');
-    document.getElementById('modal-echange').classList.remove('active');
-    return;
-  }
-  const player  = G.joueurs[0];
-  const sorted  = [...echangeSelected].sort((a, b) => b - a);
-  const removed = sorted.map(i => player.hand.splice(i, 1)[0]);
+function confirmEchange() {
+  if(echangeSelection.length===0)return;
+  if(G.sac.length<5){log('Sac presque vide','bad');closeEchangeModal();return;}
+  
+  const p=G.joueurs[0];
+  const idxs=[...echangeSelection].sort((a,b)=>b-a);
+  const removed=idxs.map(i=>p.hand.splice(i,1)[0]);
   G.sac.push(...removed);
   shuffle(G.sac);
-  player.hand.push(...drawTokens(G.sac, removed.length));
-  log(`🔄 ${player.name} échange ${removed.length} jeton(s).`, 'info');
-  document.getElementById('modal-echange').classList.remove('active');
-  nextPlayer();
-});
-
-document.getElementById('btn-echange-cancel').addEventListener('click', () => {
-  document.getElementById('modal-echange').classList.remove('active');
-});
-
-// ---------- BOUTONS ----------
-
-document.getElementById('btn-valider').addEventListener('click', () => {
-  if (G.joueurs[G.currentPlayerIndex].isIA) {
-    log('⏳ Ce n\'est pas votre tour.', 'bad'); return;
-  }
-  confirmMove();
-});
-
-document.getElementById('btn-annuler-coup').addEventListener('click', cancelMove);
-
-document.getElementById('btn-echanger').addEventListener('click', () => {
-  if (G.joueurs[G.currentPlayerIndex].isIA) {
-    log('⏳ Ce n\'est pas votre tour.', 'bad'); return;
-  }
-  if (G.pending.length > 0) {
-    log('❌ Annulez vos placements avant d\'échanger.', 'bad'); return;
-  }
-  openEchangeModal();
-});
-
-document.getElementById('btn-quitter').addEventListener('click', () => {
-  G = null;
-  document.getElementById('screen-game').style.display = 'none';
-  document.getElementById('screen-lobby').style.display = 'block';
-});
-
-document.getElementById('btn-rejouer').addEventListener('click', () => {
-  document.getElementById('modal-fin').classList.remove('active');
-  const pseudo = document.getElementById('input-pseudo').value.trim() || 'Joueur';
-  startGame([pseudo, 'IA']);
-});
-
-// ---------- DÉMARRAGE ----------
-
-function startGame(players) {
-  G = createGame(players);
-  document.getElementById('screen-lobby').style.display = 'none';
-  document.getElementById('screen-game').style.display  = 'block';
-  document.getElementById('message-log').innerHTML = '';
-  log('🎮 Nouvelle partie ! Bon jeu !', 'good');
-  log(`📦 Sac : ${G.sac.length} jetons`, 'info');
-  render();
+  p.hand.push(...draw(G.sac,removed.length));
+  
+  log(`🔄 Échange ${removed.length} jeton(s)`, 'info');
+  closeEchangeModal();
+  nextTurn();
 }
 
-document.getElementById('btn-solo').addEventListener('click', () => {
-  const pseudo = document.getElementById('input-pseudo').value.trim() || 'Joueur';
-  startGame([pseudo, 'IA']);
-});
-
-document.getElementById('btn-creer-salon').addEventListener('click', () => {
-  const pseudo = document.getElementById('input-pseudo').value.trim() || 'Joueur';
-  const salon  = document.getElementById('input-salon-name').value.trim();
-  if (!salon) { alert('Donnez un nom au salon !'); return; }
-  startGame([pseudo, 'IA']);
-});
+function closeEchangeModal() {
+  document.getElementById('modal-echange').classList.remove('active');
+}
 
 // ---------- LOG ----------
 
-function log(msg, type = '') {
-  const div = document.getElementById('message-log');
-  if (!div) return;
-  const p = document.createElement('p');
-  p.textContent = msg;
-  if (type) p.classList.add(type);
+function log(msg,type='info') {
+  const div=document.getElementById('message-log');
+  const p=document.createElement('p');
+  p.textContent=msg;
+  if(type==='good')p.className='log-good';
+  if(type==='bad')p.className='log-bad';
+  if(type==='points')p.className='log-points';
+  if(type==='info')p.className='log-info';
+  
+  if(logMode==='compact'&&type!=='points'&&type!=='good'){
+    // En mode compact, on n'affiche que les points et les actions importantes
+    return; 
+  }
+  
   div.prepend(p);
-  while (div.children.length > 30) div.removeChild(div.lastChild);
+  while(div.children.length>20)div.removeChild(div.lastChild);
+}
+
+function setLogMode(mode) {
+  logMode=mode;
+  document.getElementById('btn-detailed').classList.toggle('active',mode==='detailed');
+  document.getElementById('btn-compact').classList.toggle('active',mode==='compact');
+  const div=document.getElementById('message-log');
+  div.classList.toggle('compact',mode==='compact');
+}
+
+// ---------- INIT ----------
+
+document.getElementById('btn-valider').onclick=playTurn;
+document.getElementById('btn-annuler').onclick=()=>{
+  G.pending=[];
+  selectedTokenIdx=null;
+  render();
+};
+document.getElementById('btn-echanger').onclick=openEchange;
+document.getElementById('btn-quitter').onclick=()=>location.reload();
+
+function startGame() {
+  const pseudo=document.getElementById('input-pseudo').value||'Joueur';
+  const mode=document.getElementById('select-mode').value;
+  
+  const players=mode==='solo'?[pseudo,'IA']:[pseudo,'Joueur 2'];
+  G=initGame(players);
+  
+  document.getElementById('screen-lobby').style.display='none';
+  document.getElementById('screen-game').style.display='block';
+  
+  log('🎮 Début de partie!', 'good');
+  render();
 }
