@@ -882,3 +882,4 @@ function log(msg, type = '') {
   div.prepend(p);
   while (div.children.length > 30) div.removeChild(div.lastChild);
 }
+
