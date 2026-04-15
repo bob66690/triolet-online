@@ -320,6 +320,40 @@
       .game-layout { flex-direction: column; align-items: center; }
       .side-panel { width: 100%; max-width: 500px; }
     }
+
+
+    /* Jeton pending sur le plateau (vert bordure) */
+.token-pending {
+  border-color: #00c9a7 !important;
+  cursor: pointer;
+}
+.token-pending:hover { opacity: 0.8; }
+
+/* Valeur du joker dans l'angle */
+.token-main {
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
+}
+.token-corner {
+  position: absolute;
+  bottom: 2px;
+  right: 3px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #8B4513;
+  background: rgba(255,255,255,0.7);
+  border-radius: 3px;
+  padding: 0 2px;
+  line-height: 1.2;
+}
+
+/* Case label (×2, ×3, ↺) */
+.cell-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  pointer-events: none;
+}
   </style>
 </head>
 <body>
