@@ -1,171 +1,233 @@
-const express = require('express');
-const app = express();
-const server = require('http').createServer(app);
-const io = require('socket.io')(server);
+document.addEventListener('DOMContentLoaded', () => {
+    const board = document.getElementById('board');
+    const messageDiv = document.getElementById('message');
+    const newGameButton = document.getElementById('new-game');
+    const undoButton = document.getElementById('undo');
 
-app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/index.html');
-});
+    let game = null;
+    let moveHistory = []; // Pour l'historique des coups
 
-const rooms = new Map();
-
-function buildBag() {
-  const counts = [9,9,8,8,7,8,6,6,4,4,3,3,2,2,1,1];
-  const bag = [];
-  counts.forEach((cnt, val) => {
-    for (let i = 0; i < cnt; i++) {
-      bag.push({ val, id: `${val}-${i}`, isJoker: false });
+    function initGame() {
+        game = {
+            board: Array(8).fill(null).map(() => Array(8).fill(null)),
+            currentPlayer: 'black', // Les noirs commencent
+            gameOver: false,
+            winner: null,
+            validMoves: []
+        };
+        initializePieces();
+        calculateValidMoves();
+        renderBoard();
+        updateMessage(`Nouvelle partie ! C'est au tour des ${game.currentPlayer}s.`);
+        moveHistory = []; // Réinitialiser l'historique
     }
-  });
-  bag.push({ val: null, id: 'joker-0', isJoker: true });
-  bag.push({ val: null, id: 'joker-1', isJoker: true });
-  return shuffle(bag);
-}
 
-function shuffle(arr) {
-  const a = arr.slice();
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
+    function initializePieces() {
+        // Position initiale standard
+        game.board[3][3] = 'white';
+        game.board[3][4] = 'black';
+        game.board[4][3] = 'black';
+        game.board[4][4] = 'white';
+    }
 
-function initGameState(players) {
-  const PLAYER_COLORS = ["#e63946","#06d6a0","#ffd166","#118ab2"];
-  const bag = buildBag();
-  bag.splice(0, 3);
-  
-  const gamePlayers = players.map((p, i) => ({
-    ...p,
-    color: PLAYER_COLORS[i],
-    hand: [bag.shift(), bag.shift(), bag.shift()],
-    score: 0
-  }));
-
-  const drawn = gamePlayers.map(() => bag.shift());
-  const vals = drawn.map(t => t.isJoker ? 0 : t.val);
-  const maxVal = Math.max(...vals);
-  const winners = vals.reduce((acc, v, i) => v === maxVal ? [...acc, i] : acc, []);
-  const first = winners[Math.floor(Math.random() * winners.length)];
-
-  gamePlayers.forEach((p, i) => {
-    p.hand[0] = drawn[i];
-  });
-
-  return {
-    players: gamePlayers,
-    bag,
-    grid: Array.from({ length: 15 }, () => Array(15).fill(null)),
-    currentPlayer: first,
-    turnCount: 0,
-    specialUsedGame: [],
-    gameOver: false
-  };
-}
-
-io.on('connection', (socket) => {
-  console.log('✅ Connecté:', socket.id);
-
-  socket.on('getRooms', () => {
-    socket.emit('roomList', Array.from(rooms.values()).map(r => ({
-      id: r.id, name: r.name, players: r.players.length, status: r.status
-    })));
-  });
-
-  socket.on('createRoom', ({ name, player }) => {
-    const roomId = 'R' + Date.now();
-    const room = {
-      id: roomId,
-      name,
-      players: [{ id: socket.id, ...player }],
-      host: socket.id,
-      status: 'waiting',
-      gameState: null
-    };
-    rooms.set(roomId, room);
-    socket.join(roomId);
-    socket.emit('joined', room);
-    io.emit('roomList', Array.from(rooms.values()).map(r => ({
-      id: r.id, name: r.name, players: r.players.length, status: r.status
-    })));
-  });
-
-  socket.on('joinRoom', ({ roomId, player }) => {
-    const room = rooms.get(roomId);
-    if (!room) return;
-    if (room.players.some(p => p.id === socket.id)) return socket.emit('joined', room);
-    room.players.push({ id: socket.id, ...player });
-    socket.join(roomId);
-    io.to(roomId).emit('updateRoom', room);
-    io.emit('roomList', Array.from(rooms.values()).map(r => ({
-      id: r.id, name: r.name, players: r.players.length, status: r.status
-    })));
-  });
-
-  socket.on('chat', ({ roomId, name, text }) => {
-    io.to(roomId).emit('chatMsg', { name, text, time: new Date().toLocaleTimeString() });
-  });
-
-  socket.on('startGame', ({ roomId }) => {
-    const room = rooms.get(roomId);
-    if (!room || room.host !== socket.id) return;
-    room.gameState = initGameState(room.players);
-    room.status = 'playing';
-    io.to(roomId).emit('gameStarted', { message: '🎮 Partie lancée !', gameState: room.gameState });
-    io.emit('roomList', Array.from(rooms.values()).map(r => ({
-      id: r.id, name: r.name, players: r.players.length, status: r.status
-    })));
-  });
-
-  socket.on('playTurn', ({ roomId, placements }) => {
-    const room = rooms.get(roomId);
-    if (!room || !room.gameState) return;
-    const gs = room.gameState;
-    if (gs.players[gs.currentPlayer].id !== socket.id) return;
-
-    const newGrid = gs.grid.map(row => [...row]);
-    placements.forEach(p => { newGrid[p.r][p.c] = p.token; });
-
-    const newPlayers = gs.players.map((pl, i) => {
-      if (i !== gs.currentPlayer) return pl;
-      const newHand = [...pl.hand];
-      placements.forEach(p => { newHand[p.handIdx] = null; });
-      for (let j = 0; j < 3; j++) {
-        if (newHand[j] === null && gs.bag.length > 0) newHand[j] = gs.bag.shift();
-      }
-      return { ...pl, hand: newHand, score: pl.score + (placements.length * 5) };
-    });
-
-    room.gameState = {
-      ...gs,
-      players: newPlayers,
-      grid: newGrid,
-      currentPlayer: (gs.currentPlayer + 1) % gs.players.length,
-      turnCount: gs.turnCount + 1,
-      gameOver: gs.bag.length === 0 && newPlayers.every(p => p.hand.every(t => !t))
-    };
-
-    io.to(roomId).emit('gameUpdate', room.gameState);
-  });
-
-  socket.on('disconnect', () => {
-    rooms.forEach((room, id) => {
-      const idx = room.players.findIndex(p => p.id === socket.id);
-      if (idx > -1) {
-        room.players.splice(idx, 1);
-        if (room.players.length === 0) rooms.delete(id);
-        else {
-          if (room.host === socket.id) room.host = room.players[0].id;
-          io.to(id).emit('updateRoom', room);
+    function calculateValidMoves() {
+        game.validMoves = [];
+        for (let row = 0; row < 8; row++) {
+            for (let col = 0; col < 8; col++) {
+                if (isValidMove(row, col, game.currentPlayer)) {
+                    game.validMoves.push({row, col});
+                }
+            }
         }
-        io.emit('roomList', Array.from(rooms.values()).map(r => ({
-          id: r.id, name: r.name, players: r.players.length, status: r.status
-        })));
-      }
-    });
-  });
-});
+    }
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log('🎮 Serveur sur port', PORT));
+    function isValidMove(row, col, player) {
+        if (game.board[row][col] !== null) return false;
+        
+        const opponent = player === 'white' ? 'black' : 'white';
+        let hasValidDirection = false;
+        
+        // Directions: haut, bas, gauche, droite, diagonales
+        const directions = [
+            [-1, 0], [1, 0], [0, -1], [0, 1],
+            [-1, -1], [-1, 1], [1, -1], [1, 1]
+        ];
+        
+        for (const [dRow, dCol] of directions) {
+            let r = row + dRow;
+            let c = col + dCol;
+            let foundOpponent = false;
+            
+            while (r >= 0 && r < 8 && c >= 0 && c < 8) {
+                if (game.board[r][c] === null) break;
+                if (game.board[r][c] === opponent) {
+                    foundOpponent = true;
+                } else if (game.board[r][c] === player && foundOpponent) {
+                    return true; // Coup valide
+                } else {
+                    break;
+                }
+                r += dRow;
+                c += dCol;
+            }
+        }
+        
+        return false;
+    }
+
+    function makeMove(row, col) {
+        if (!game.validMoves.some(m => m.row === row && m.col === col)) return;
+        
+        // Sauvegarder l'état actuel
+        moveHistory.push(JSON.parse(JSON.stringify(game)));
+        
+        // Placer la pièce
+        game.board[row][col] = game.currentPlayer;
+        
+        // Retourner les pièces capturées
+        flipPieces(row, col, game.currentPlayer);
+        
+        // Vérifier s'il y a des coups valides pour l'adversaire
+        game.currentPlayer = game.currentPlayer === 'white' ? 'black' : 'white';
+        calculateValidMoves();
+        
+        // Si le joueur actuel n'a pas de coups valides, passer au joueur suivant
+        if (game.validMoves.length === 0) {
+            game.currentPlayer = game.currentPlayer === 'white' ? 'black' : 'white';
+            calculateValidMoves();
+            if (game.validMoves.length === 0) {
+                endGame();
+            } else {
+                updateMessage(`Aucun coup valide pour les ${game.currentPlayer === 'white' ? 'blancs' : 'noirs'}. Passage de tour.`);
+            }
+        } else {
+            updateMessage(`C'est au tour des ${game.currentPlayer}s.`);
+        }
+        
+        renderBoard();
+        updateScore();
+    }
+
+    function flipPieces(row, col, player) {
+        const opponent = player === 'white' ? 'black' : 'white';
+        const directions = [
+            [-1, 0], [1, 0], [0, -1], [0, 1],
+            [-1, -1], [-1, 1], [1, -1], [1, 1]
+        ];
+        
+        for (const [dRow, dCol] of directions) {
+            let r = row + dRow;
+            let c = col + dCol;
+            let piecesToFlip = [];
+            let foundPlayer = false;
+            
+            while (r >= 0 && r < 8 && c >= 0 && c < 8) {
+                if (game.board[r][c] === null) break;
+                if (game.board[r][c] === opponent) {
+                    piecesToFlip.push({r, c});
+                } else if (game.board[r][c] === player && piecesToFlip.length > 0) {
+                    foundPlayer = true;
+                    break;
+                } else {
+                    break;
+                }
+                r += dRow;
+                c += dCol;
+            }
+            
+            if (foundPlayer) {
+                for (const {r, c} of piecesToFlip) {
+                    game.board[r][c] = player;
+                }
+            }
+        }
+    }
+
+    function endGame() {
+        game.gameOver = true;
+        const whiteCount = countPieces('white');
+        const blackCount = countPieces('black');
+        
+        if (whiteCount > blackCount) {
+            game.winner = 'white';
+            updateMessage(`Partie terminée ! Les blancs gagnent ${whiteCount} à ${blackCount}.`);
+        } else if (blackCount > whiteCount) {
+            game.winner = 'black';
+            updateMessage(`Partie terminée ! Les noirs gagnent ${blackCount} à ${whiteCount}.`);
+        } else {
+            game.winner = 'draw';
+            updateMessage(`Partie terminée ! Égalité ${whiteCount} partout.`);
+        }
+    }
+
+    function countPieces(color) {
+        let count = 0;
+        for (let row = 0; row < 8; row++) {
+            for (let col = 0; col < 8; col++) {
+                if (game.board[row][col] === color) count++;
+            }
+        }
+        return count;
+    }
+
+    function updateScore() {
+        const whiteCount = countPieces('white');
+        const blackCount = countPieces('black');
+        updateMessage(`${whiteCount} blancs - ${blackCount} noirs`);
+    }
+
+    function undo() {
+        if (moveHistory.length > 0) {
+            game = moveHistory.pop();
+            // Retourner au joueur précédent
+            game.currentPlayer = game.currentPlayer === 'white' ? 'black' : 'white';
+            calculateValidMoves();
+            renderBoard();
+            updateScore();
+            updateMessage(`C'est au tour des ${game.currentPlayer}s.`);
+        }
+    }
+
+    function renderBoard() {
+        board.innerHTML = '';
+        for (let row = 0; row < 8; row++) {
+            for (let col = 0; col < 8; col++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.dataset.row = row;
+                cell.dataset.col = col;
+                
+                // Ajouter une pièce si présente
+                if (game.board[row][col]) {
+                    const piece = document.createElement('div');
+                    piece.className = `piece ${game.board[row][col]}`;
+                    cell.appendChild(piece);
+                }
+                
+                // Mettre en évidence les coups valides
+                if (!game.gameOver && game.validMoves.some(m => m.row === row && m.col === col)) {
+                    cell.classList.add('valid-move');
+                    cell.style.backgroundColor = '#90EE90';
+                }
+                
+                // Gestion des clics
+                cell.addEventListener('click', () => handleCellClick(row, col));
+                board.appendChild(cell);
+            }
+        }
+    }
+
+    function handleCellClick(row, col) {
+        if (game.gameOver) return;
+        makeMove(row, col);
+    }
+
+    function updateMessage(text) {
+        messageDiv.textContent = text;
+    }
+
+    newGameButton.addEventListener('click', initGame);
+    undoButton.addEventListener('click', undo);
+
+    initGame();
+});
