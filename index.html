@@ -71,7 +71,7 @@ header h1{
 }
 .field:focus{outline:none;border-color:#f59e0b;}
 
-/* ===== BOUTONS ===== */
+/* ===== BOUTONS GÉNÉRAUX ===== */
 .btn{
   display:block;
   width:100%;
@@ -106,7 +106,7 @@ header h1{
   flex-wrap:wrap;
 }
 
-/* ===== ZONE PLATEAU ===== */
+/* ===== ZONE PLATEAU + CHEVALET ===== */
 .board-zone{
   display:flex;
   flex-direction:column;
@@ -115,6 +115,7 @@ header h1{
   flex-shrink:0;
 }
 
+/* Plateau */
 .board-shell{
   background:#0f2a5e;
   border-radius:4px;
@@ -122,19 +123,15 @@ header h1{
   box-shadow:0 8px 32px rgba(0,0,0,.6);
   display:inline-block;
 }
-
 .board-grid-wrap{
   display:grid;
   grid-template-columns:var(--lbl) auto;
   grid-template-rows:var(--lbl) auto;
 }
-
 .coord-corner{
-  width:var(--lbl);
-  height:var(--lbl);
+  width:var(--lbl);height:var(--lbl);
   background:#0f2a5e;
 }
-
 .coord-cols{
   display:flex;
   background:#0f2a5e;
@@ -147,7 +144,6 @@ header h1{
   font-weight:600;
   line-height:var(--lbl);
 }
-
 .coord-rows{
   display:flex;
   flex-direction:column;
@@ -163,7 +159,6 @@ header h1{
   color:#7dd3fc;
   font-weight:600;
 }
-
 #board{
   display:grid;
   grid-template-columns:repeat(15,var(--cs));
@@ -171,10 +166,8 @@ header h1{
   gap:1px;
   background:#0a1f4a;
 }
-
 .cell{
-  width:var(--cs);
-  height:var(--cs);
+  width:var(--cs);height:var(--cs);
   background:#1e4080;
   display:flex;
   align-items:center;
@@ -187,28 +180,23 @@ header h1{
   overflow:hidden;
 }
 .cell:hover{background:#28509a;}
-
-/* Cases spéciales */
 .cell.sp-R{background:#6d28d9;}
 .cell.sp-D{background:#2563eb;}
 .cell.sp-T{background:#16a34a;}
 .cell.sp-C{background:#d97706;}
-
-/* Case peut recevoir un jeton */
 .cell.placeable{
   background:#14532d !important;
   box-shadow:inset 0 0 0 2px #4ade80;
 }
 .cell.placeable:hover{background:#166534 !important;}
 
-/* Label cases spéciales */
+/* Labels cases spéciales */
 .cell-lbl{
   display:flex;
   flex-direction:column;
   align-items:center;
   justify-content:center;
-  width:100%;
-  height:100%;
+  width:100%;height:100%;
   pointer-events:none;
   user-select:none;
 }
@@ -226,7 +214,7 @@ header h1{
   filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));
 }
 
-/* ===== JETONS SUR PLATEAU ===== */
+/* Jetons plateau */
 .tok{
   width:calc(var(--cs) - 4px);
   height:calc(var(--cs) - 4px);
@@ -246,22 +234,20 @@ header h1{
 }
 .tok.joker{
   background:linear-gradient(145deg,#fff3e0,#ffcc80);
-  color:#dc2626;   /* X en rouge */
+  color:#dc2626;
   font-weight:900;
 }
 .tok.pending{
   border:2px solid #22c55e;
-  box-shadow:0 0 6px rgba(34,197,94,.5),
-             inset 0 1px 0 rgba(255,255,255,.5);
+  box-shadow:0 0 6px rgba(34,197,94,.5),inset 0 1px 0 rgba(255,255,255,.5);
   cursor:pointer;
 }
-/* Valeur du joker dans l'angle : noire */
 .tok .jcorner{
   position:absolute;
   bottom:1px;right:2px;
   font-size:calc(var(--cs) * .22);
   font-weight:900;
-  color:#1a1a1a;   /* valeur en noir */
+  color:#1a1a1a;
   font-style:normal;
   line-height:1;
   background:rgba(255,255,255,.85);
@@ -269,44 +255,52 @@ header h1{
   padding:0 2px;
 }
 
-/* ===== ZONE CHEVALET + BOUTONS ===== */
+/* ===================================================
+   CHEVALET + BOUTONS CÔTE À CÔTE
+   =================================================== */
 .hand-action-row{
   display:flex;
+  flex-direction:row;
   gap:6px;
   width:100%;
   align-items:stretch;
 }
 
-/* Boutons verticaux à gauche et à droite */
-.side-btns{
+/* Colonnes de boutons verticaux */
+.vbtns{
   display:flex;
   flex-direction:column;
   gap:6px;
+  flex-shrink:0;
 }
+
+/* Bouton vertical */
 .vbtn{
   flex:1;
   border:none;
   border-radius:8px;
-  font-weight:700;
+  font-weight:800;
   cursor:pointer;
   transition:opacity .15s,transform .15s;
   -webkit-tap-highlight-color:transparent;
+  /* Texte vertical */
   writing-mode:vertical-lr;
   transform:rotate(180deg);
-  padding:10px 7px;
-  font-size:clamp(.6rem,.8vw,.78rem);
+  padding:12px 0;
+  width:38px;           /* largeur fixe */
+  font-size:clamp(.55rem,.7vw,.72rem);
   white-space:nowrap;
-  min-width:36px;
   text-transform:uppercase;
   letter-spacing:.4px;
+  text-align:center;
 }
-.vbtn:active{opacity:.8;}
+.vbtn:active{opacity:.75;transform:rotate(180deg) scale(.97);}
 .vbtn-green{background:#22c55e;color:#fff;}
 .vbtn-blue {background:#3b82f6;color:#fff;}
 .vbtn-gray {background:#475569;color:#fff;}
 .vbtn-red  {background:#ef4444;color:#fff;}
 
-/* Chevalet (centre) */
+/* Chevalet (zone centrale) */
 .hand-zone{
   background:#1e293b;
   border:1px solid #334155;
@@ -314,6 +308,9 @@ header h1{
   padding:10px 12px;
   flex:1;
   min-width:0;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
 }
 .hand-info{
   font-size:.78rem;
@@ -335,7 +332,7 @@ header h1{
   align-items:center;
 }
 
-/* Jetons du chevalet */
+/* Jetons chevalet */
 .htok{
   width:52px;height:52px;
   background:linear-gradient(145deg,#fef9e7,#f5d76e);
@@ -348,8 +345,7 @@ header h1{
   font-size:1.25rem;
   border:2px solid transparent;
   cursor:pointer;
-  box-shadow:0 3px 6px rgba(0,0,0,.25),
-             inset 0 1px 0 rgba(255,255,255,.5);
+  box-shadow:0 3px 6px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.5);
   transition:transform .15s,box-shadow .15s,border-color .15s;
   -webkit-tap-highlight-color:transparent;
   user-select:none;
@@ -361,12 +357,11 @@ header h1{
 .htok.sel{
   border-color:#22c55e;
   transform:translateY(-7px);
-  box-shadow:0 0 0 3px rgba(34,197,94,.35),
-             0 8px 14px rgba(0,0,0,.3);
+  box-shadow:0 0 0 3px rgba(34,197,94,.35),0 8px 14px rgba(0,0,0,.3);
 }
 .htok.joker{
   background:linear-gradient(145deg,#fff3e0,#ffcc80);
-  color:#dc2626;   /* X rouge aussi sur le chevalet */
+  color:#dc2626;
   font-weight:900;
 }
 .htok.ghost{
@@ -375,10 +370,7 @@ header h1{
   cursor:default;
   border-color:#334155;
 }
-.htok.ghost:hover{
-  transform:none;
-  box-shadow:inset 0 2px 4px rgba(0,0,0,.4);
-}
+.htok.ghost:hover{transform:none;box-shadow:inset 0 2px 4px rgba(0,0,0,.4);}
 
 /* ===== PANEL DROIT ===== */
 .side-panel{
@@ -424,13 +416,9 @@ header h1{
 .log-toggle{display:flex;gap:5px;}
 .ltbtn{
   padding:3px 10px;
-  border:none;
-  border-radius:12px;
-  font-size:.7rem;
-  cursor:pointer;
-  background:#334155;
-  color:#94a3b8;
-  font-weight:600;
+  border:none;border-radius:12px;
+  font-size:.7rem;cursor:pointer;
+  background:#334155;color:#94a3b8;font-weight:600;
   transition:background .15s;
 }
 .ltbtn.on{background:#22c55e;color:#fff;}
@@ -465,51 +453,29 @@ header h1{
   background:#1e293b;
   border-radius:14px;
   padding:22px;
-  width:100%;
-  max-width:340px;
+  width:100%;max-width:340px;
   border:1px solid #475569;
   box-shadow:0 25px 50px rgba(0,0,0,.6);
 }
-.modal h2{
-  color:#fbbf24;
-  text-align:center;
-  margin-bottom:10px;
-  font-size:1.15rem;
-}
-.modal .sub{
-  color:#94a3b8;
-  text-align:center;
-  font-size:.88rem;
-  margin-bottom:14px;
-}
+.modal h2{color:#fbbf24;text-align:center;margin-bottom:10px;font-size:1.15rem;}
+.modal .sub{color:#94a3b8;text-align:center;font-size:.88rem;margin-bottom:14px;}
 .jgrid{
   display:grid;
   grid-template-columns:repeat(4,1fr);
-  gap:7px;
-  margin-bottom:14px;
+  gap:7px;margin-bottom:14px;
 }
 .jval{
   padding:11px 4px;
-  background:#334155;
-  border-radius:7px;
-  text-align:center;
-  cursor:pointer;
-  font-weight:700;
-  font-size:.95rem;
+  background:#334155;border-radius:7px;
+  text-align:center;cursor:pointer;
+  font-weight:700;font-size:.95rem;
   transition:background .15s,transform .1s;
   -webkit-tap-highlight-color:transparent;
 }
-.jval:hover,.jval:active{
-  background:#f59e0b;
-  color:#1a1a1a;
-  transform:scale(1.08);
-}
+.jval:hover,.jval:active{background:#f59e0b;color:#1a1a1a;transform:scale(1.08);}
 .finrow{
-  display:flex;
-  justify-content:space-between;
-  padding:8px 0;
-  border-bottom:1px solid #334155;
-  font-size:.95rem;
+  display:flex;justify-content:space-between;
+  padding:8px 0;border-bottom:1px solid #334155;font-size:.95rem;
 }
 .finrow:last-child{border-bottom:none;}
 .finpts{font-weight:800;color:#fbbf24;}
@@ -531,17 +497,17 @@ header h1{
 @media(max-width:680px){
   :root{--cs:26px;--lbl:16px;--csf:.52rem;}
   .htok{width:46px;height:46px;font-size:1.05rem;}
-  .vbtn{font-size:.6rem;min-width:30px;padding:8px 5px;}
+  .vbtn{width:32px;font-size:.52rem;}
 }
 @media(max-width:520px){
   :root{--cs:22px;--lbl:14px;--csf:.46rem;}
   .htok{width:42px;height:42px;font-size:.95rem;}
-  .vbtn{font-size:.55rem;min-width:28px;padding:7px 4px;}
+  .vbtn{width:28px;font-size:.48rem;padding:10px 0;}
 }
 @media(max-width:420px){
   :root{--cs:19px;--lbl:13px;--csf:.42rem;}
   .htok{width:38px;height:38px;font-size:.88rem;}
-  .vbtn{font-size:.5rem;min-width:26px;padding:6px 4px;}
+  .vbtn{width:26px;font-size:.44rem;padding:8px 0;}
 }
 </style>
 </head>
@@ -575,7 +541,7 @@ header h1{
 <div id="screen-game">
   <div class="game-wrap">
 
-    <!-- Plateau + chevalet + actions -->
+    <!-- Gauche : plateau + chevalet encadré -->
     <div class="board-zone">
 
       <!-- Plateau -->
@@ -588,17 +554,21 @@ header h1{
         </div>
       </div>
 
-      <!-- Chevalet encadré par les boutons verticaux -->
+      <!--
+        CHEVALET ENCADRÉ PAR LES BOUTONS VERTICAUX
+        [Valider  ]  [  chevalet  ]  [Annuler]
+        [Echanger ]  [  chevalet  ]  [Quitter]
+      -->
       <div class="hand-action-row">
 
-        <!-- Gauche : Valider + Échanger -->
-        <div class="side-btns">
+        <!-- Boutons GAUCHE -->
+        <div class="vbtns">
           <button id="btn-valider"  class="vbtn vbtn-green">✅ Valider</button>
-          <button id="btn-echanger" class="vbtn vbtn-blue">🔄 Échange</button>
+          <button id="btn-echanger" class="vbtn vbtn-blue" >🔄 Échange</button>
         </div>
 
-        <!-- Chevalet -->
-        <div class="hand-zone" id="hand-zone">
+        <!-- Chevalet CENTRE -->
+        <div class="hand-zone">
           <div class="hand-info">
             <span>🎴 <strong id="turn-name">-</strong></span>
             <span>🎒 Sac : <strong id="sac-ct">80</strong></span>
@@ -606,16 +576,16 @@ header h1{
           <div id="hand-tokens" class="hand-tokens"></div>
         </div>
 
-        <!-- Droite : Annuler + Quitter -->
-        <div class="side-btns">
+        <!-- Boutons DROITE -->
+        <div class="vbtns">
           <button id="btn-annuler" class="vbtn vbtn-gray">↩ Annuler</button>
-          <button id="btn-quitter" class="vbtn vbtn-red">🚪 Quitter</button>
+          <button id="btn-quitter" class="vbtn vbtn-red" >🚪 Quitter</button>
         </div>
 
       </div>
-    </div>
+    </div><!-- fin board-zone -->
 
-    <!-- Panel droit : scores + journal -->
+    <!-- Droite : scores + journal -->
     <div class="side-panel">
 
       <div class="pcard">
@@ -656,10 +626,8 @@ header h1{
     <div id="ech-toks"
          style="display:flex;gap:8px;justify-content:center;
                 margin:12px 0;flex-wrap:wrap;min-height:56px;"></div>
-    <button id="btn-ech-ok"  class="btn btn-green" style="margin-bottom:8px;">
-      Confirmer
-    </button>
-    <button id="btn-ech-no"  class="btn btn-gray">Annuler</button>
+    <button id="btn-ech-ok" class="btn btn-green" style="margin-bottom:8px;">Confirmer</button>
+    <button id="btn-ech-no" class="btn btn-gray">Annuler</button>
   </div>
 </div>
 
