@@ -1,5 +1,6 @@
 // =====================================================
 //  TRIOLET ONLINE  –  index.js
+//  Règles officielles Gigamic + 1-4 joueurs
 // =====================================================
 
 const DISTRIB = {
@@ -8,7 +9,7 @@ const DISTRIB = {
 };
 
 const SPECS = (function(){
-  const m = {};
+  const m={};
   function add(list,type){
     list.forEach(s=>{
       const r=s.charCodeAt(0)-65;
@@ -29,10 +30,17 @@ let echSel  = [];
 let jokerCB = null;
 let logMode = 'detail';
 
+// Config lobby
+let nbPlayers = 2;
+let playersConfig = [
+  {name:'Joueur', isAI:false},
+  {name:'IA',     isAI:true}
+];
+
 // =====================================================
 //  CRÉATION
 // =====================================================
-function newGame(players){
+function newGame(configs){
   const sac=[];
   Object.entries(DISTRIB).forEach(([v,q])=>{
     for(let i=0;i<q;i++)
@@ -42,21 +50,29 @@ function newGame(players){
   sac.push({val:null,isJoker:true,jokerVal:null});
   shuffle(sac);
   sac.splice(0,3);
-  const joueurs=players.map((name,i)=>({
-    name,score:0,
-    hand:sac.splice(-3,3),
-    isAI:(name==='IA')
+
+  const joueurs=configs.map(cfg=>({
+    name : cfg.name||'Joueur',
+    score: 0,
+    hand : sac.splice(-3,3),
+    isAI : cfg.isAI
   }));
+
   return{
-    board:Array(15).fill(null).map(()=>Array(15).fill(null)),
-    sac,joueurs,
-    cur:0,first:true,
-    usedSp:new Set(),
-    pend:[],
-    rejouer:false,over:false
+    board  : Array(15).fill(null).map(()=>Array(15).fill(null)),
+    sac, joueurs,
+    cur    : 0,
+    first  : true,
+    usedSp : new Set(),
+    pend   : [],
+    rejouer: false,
+    over   : false
   };
 }
 
+// =====================================================
+//  UTILITAIRES
+// =====================================================
 function shuffle(a){
   for(let i=a.length-1;i>0;i--){
     const j=Math.floor(Math.random()*(i+1));
@@ -67,10 +83,25 @@ function drawN(sac,n){
   n=Math.min(n,sac.length);
   return n>0?sac.splice(-n,n):[];
 }
+
+// Valeur effective d'un jeton pour le PLACEMENT (position sur plateau)
+// Le joker a la valeur choisie pour déterminer si le coup est légal
 function ev(t){
   if(!t)return null;
   return t.isJoker?t.jokerVal:t.val;
 }
+
+// ── RÈGLE OFFICIELLE JOKER ──
+// "La valeur d'un Joker est NULLE pour le comptage des points"
+// SAUF dans un Trio/Triolet où il n'entraîne aucune modification (30 pts quand même)
+// => Pour les PAIRES : le joker vaut 0 dans le décompte
+// => Pour les TRIOS  : le trio vaut 30 pts (le joker n'ajoute rien, ne retire rien)
+function scoreVal(t){
+  if(!t)return 0;
+  if(t.isJoker)return 0;  // joker = 0 point dans le décompte
+  return t.val;
+}
+
 function specAt(r,c){
   const k=r+','+c;
   if(G.usedSp.has(k))return null;
@@ -149,6 +180,7 @@ function validate(){
       return fail('Les jetons doivent être adjacents à un jeton en place');
   }
 
+  // Vérif séquences — on utilise ev() (valeur effective) pour valider le placement
   const b=vboard();
   for(const px of p){
     for(const[dr,dc]of[[0,1],[1,0]]){
@@ -158,11 +190,14 @@ function validate(){
       const vals=line.map(l=>ev(l.tok));
       if(vals.some(v=>v===null))return fail('La valeur du joker doit être définie');
       const sum=vals.reduce((a,b)=>a+b,0);
-      if(line.length===2&&sum>15)return fail(`Cette paire fait ${sum} > 15`);
-      if(line.length===3&&sum!==15)return fail(`Ce trio fait ${sum} au lieu de 15`);
+      if(line.length===2&&sum>15)
+        return fail(`Cette paire fait ${sum} > 15`);
+      if(line.length===3&&sum!==15)
+        return fail(`Ce trio fait ${sum} au lieu de 15`);
     }
   }
 
+  // Carré interdit au 1er tour uniquement
   if(G.first){
     const b2=vboard();
     for(let r=0;r<14;r++){
@@ -183,40 +218,62 @@ function validate(){
 function fail(msg){return{ok:false,msg};}
 
 // =====================================================
-//  CALCUL DES POINTS
+//  CALCUL DES POINTS — RÈGLES OFFICIELLES JOKER
+//
+//  • Paire (2 jetons) : on additionne les valeurs SAUF le joker (vaut 0)
+//    ex: joker(=7 sur plateau) + 8 → score = 0 + 8 = 8 pts
+//
+//  • Trio (3 jetons, somme=15) : toujours 30 pts × multiplicateur
+//    Le joker ne modifie PAS la valeur du trio.
+//
+//  • Triolet : Trio posé en une fois → +50 pts BONUS
+//    SAUF si le triolet contient un joker (pas de bonus triolet)
+//
+//  • Cases ×2/×3 : multiplient la valeur DU JETON posé dessus
+//    Si ce jeton est un joker → 0 × multiplicateur = 0 (joker vaut 0)
+//    Mais si la case ×2 est dans un TRIO → le trio entier est ×2 (30×2=60)
 // =====================================================
 function calcPoints(){
   let total=0;
   const lines=affectedLines();
   const hasJok=G.pend.some(p=>p.isJoker);
 
-  // ── 1 seul jeton sans voisin (dont 1er coup case centrale) ──
+  // ── 1 seul jeton sans voisin ──
   if(G.pend.length===1&&lines.length===0){
     const p=G.pend[0];
     const sp=specAt(p.r,p.c);
-    const v=ev({val:p.val,isJoker:p.isJoker,jokerVal:p.jokerVal})||0;
+    // Si c'est un joker seul → vaut 0 de toute façon
+    const sv=scoreVal({val:p.val,isJoker:p.isJoker,jokerVal:p.jokerVal});
+
     if(sp==='C'||sp==='D'){
-      const pts=v*2;
+      // Joker sur case ×2 → 0×2 = 0 ; jeton normal → val×2
+      const pts=sv*2;
       G.usedSp.add(p.r+','+p.c);
       total+=pts;
-      addLog(`Case ×2 : ${v} × 2 = ${pts} pts`,'p');
+      if(p.isJoker)
+        addLog(`Joker sur case ×2 : 0 × 2 = 0 pt (joker = 0 en décompte)`,'p');
+      else
+        addLog(`Case ×2 : ${sv} × 2 = ${pts} pts`,'p');
     }else if(sp==='T'){
-      const pts=v*3;
+      const pts=sv*3;
       G.usedSp.add(p.r+','+p.c);
       total+=pts;
-      addLog(`Case ×3 : ${v} × 3 = ${pts} pts`,'p');
+      if(p.isJoker)
+        addLog(`Joker sur case ×3 : 0 × 3 = 0 pt (joker = 0 en décompte)`,'p');
+      else
+        addLog(`Case ×3 : ${sv} × 3 = ${pts} pts`,'p');
     }else{
-      addLog(`Jeton ${v} posé — 0 pt (pas de paire)`,'i');
+      addLog(`Jeton posé seul — 0 pt`,'i');
     }
     if(sp==='R'){
-      G.usedSp.add(p.r+','+p.c);
-      G.rejouer=true;
+      G.usedSp.add(p.r+','+p.c);G.rejouer=true;
       addLog('🔁 Case Rejouer !','g');
     }
     return total;
   }
 
   // ── Détection Triolet ──
+  // 3 jetons TOUS nouveaux, même ligne, somme=15, SANS joker
   let isTriolet=false,trioletLineId=-1;
   if(G.pend.length===3&&!hasJok){
     lines.forEach((line,idx)=>{
@@ -230,10 +287,13 @@ function calcPoints(){
 
   // ── Paires et Trios ──
   lines.forEach((line,lineIdx)=>{
-    const vals=line.map(l=>ev(l.tok));
-    const sum=vals.reduce((a,b)=>a+b,0);
     const len=line.length;
 
+    // Valeurs effectives (pour vérifier trio = 15)
+    const evVals=line.map(l=>ev(l.tok));
+    const evSum=evVals.reduce((a,b)=>a+b,0);
+
+    // Multiplicateur case spéciale
     let mult=1,spKey=null;
     for(const p of G.pend){
       if(!line.some(l=>l.r===p.r&&l.c===p.c))continue;
@@ -242,39 +302,62 @@ function calcPoints(){
       if(sp==='T'){mult=3;spKey=p.r+','+p.c;break;}
     }
 
-    if(len===3&&sum===15){
+    if(len===3&&evSum===15){
+      // TRIO = 30 × mult (le joker ne modifie pas la valeur du trio)
       let pts=30*mult;
-      let msg=`Trio (${vals.join('+')}=15) ×${mult} = ${30*mult}`;
-      if(isTriolet&&lineIdx===trioletLineId){
+      let msg=`Trio (${evVals.join('+')}=15) ×${mult} = ${30*mult}`;
+
+      if(hasJok){
+        msg+=' (joker inclus, pas de bonus triolet)';
+      }
+
+      // Bonus triolet : seulement si pas de joker
+      if(isTriolet&&lineIdx===trioletLineId&&!hasJok){
         pts+=50;
         msg=`🎉 TRIOLET ! ${msg} + 50 = ${pts}`;
       }
+
       if(spKey)G.usedSp.add(spKey);
       total+=pts;
       addLog(msg,'p');
 
     }else if(len===2){
+      // PAIRE : score = somme des scoreVal (joker = 0)
+      // La case spéciale s'applique sur le scoreVal du jeton posé
+      // (si joker → scoreVal=0 donc case spéciale ne change rien)
       let pts=0;
+      let detail=[];
       line.forEach(item=>{
-        const v=ev(item.tok)||0;
+        const sv=scoreVal(item.tok); // 0 si joker
         const isNew=G.pend.some(p=>p.r===item.r&&p.c===item.c);
         if(isNew){
           const sp=specAt(item.r,item.c);
-          if(sp==='D'||sp==='C'){pts+=v*2;G.usedSp.add(item.r+','+item.c);}
-          else if(sp==='T'){pts+=v*3;G.usedSp.add(item.r+','+item.c);}
-          else pts+=v;
-        }else pts+=v;
+          if(sp==='D'||sp==='C'){
+            pts+=sv*2;
+            G.usedSp.add(item.r+','+item.c);
+            detail.push(item.tok.isJoker?`X(×2=0)`:`${sv}×2=${sv*2}`);
+          }else if(sp==='T'){
+            pts+=sv*3;
+            G.usedSp.add(item.r+','+item.c);
+            detail.push(item.tok.isJoker?`X(×3=0)`:`${sv}×3=${sv*3}`);
+          }else{
+            pts+=sv;
+            detail.push(item.tok.isJoker?`X(=0)`:`${sv}`);
+          }
+        }else{
+          pts+=sv;
+          detail.push(`${sv}`);
+        }
       });
       total+=pts;
-      addLog(`Paire (${vals.join('+')}=${sum}) → ${pts} pts`,'i');
+      addLog(`Paire (${detail.join('+')}) → ${pts} pts`,'i');
     }
   });
 
-  // Case Rejouer dans paires/trios
+  // Case Rejouer
   G.pend.forEach(p=>{
     if(specAt(p.r,p.c)==='R'){
-      G.usedSp.add(p.r+','+p.c);
-      G.rejouer=true;
+      G.usedSp.add(p.r+','+p.c);G.rejouer=true;
       addLog('🔁 Case Rejouer !','g');
     }
   });
@@ -292,8 +375,6 @@ function playMove(){
   const pts=calcPoints();
   const pl=G.joueurs[G.cur];
   pl.score+=pts;
-
-  // Log score — TOUJOURS affiché même en mode minimum
   addLog(`✅ ${pl.name} : +${pts} pt${pts!==1?'s':''} → Total ${pl.score}`,'score');
 
   G.pend.forEach(p=>{
@@ -326,7 +407,7 @@ function nextTurn(){
 }
 
 // =====================================================
-//  FIN
+//  FIN DE PARTIE
 // =====================================================
 function checkEnd(){
   const pl=G.joueurs[G.cur];
@@ -334,7 +415,8 @@ function checkEnd(){
     let bonus=0;
     G.joueurs.forEach((j,i)=>{
       if(i===G.cur)return;
-      const s=j.hand.reduce((a,t)=>a+(ev(t)||0),0);
+      // Valeur des jetons restants = scoreVal (joker = 0)
+      const s=j.hand.reduce((a,t)=>a+scoreVal(t),0);
       bonus+=s;
       addLog(`${j.name} perd ${s} pts (jetons restants)`,'b');
     });
@@ -407,8 +489,6 @@ function aiTurn(){
     G.pend=[{...best}];
     const pts=calcPoints();
     pl.score+=pts;
-
-    // Score IA toujours affiché
     addLog(`🤖 ${pl.name} → ${String.fromCharCode(65+best.r)}${best.c+1} +${pts} pts → Total ${pl.score}`,'score');
 
     G.board[best.r][best.c]={val:best.val,isJoker:best.isJoker,jokerVal:best.jokerVal};
@@ -468,7 +548,10 @@ function renderBoard(){
       if(boardTok){
         cell.appendChild(makeTok(boardTok,false));
       }else if(pendTok){
-        const tk=makeTok({val:pendTok.val,isJoker:pendTok.isJoker,jokerVal:pendTok.jokerVal},true);
+        const tk=makeTok(
+          {val:pendTok.val,isJoker:pendTok.isJoker,jokerVal:pendTok.jokerVal},
+          true
+        );
         cell.appendChild(tk);
         cell.addEventListener('click',()=>removePend(r,c));
       }else{
@@ -490,7 +573,6 @@ function renderBoard(){
           }
           cell.appendChild(lbl);
         }
-
         if(selIdx!==null&&!G.joueurs[G.cur].isAI){
           if(G.first){
             if(r===7&&c===7)cell.classList.add('placeable');
@@ -528,7 +610,9 @@ function renderHand(){
   const pl=G.joueurs[G.cur];
 
   if(pl.isAI){
-    ct.innerHTML='<span style="color:#94a3b8;font-size:.85rem;display:block;text-align:center;">🤖 L\'IA réfléchit…</span>';
+    ct.innerHTML=
+      '<span style="color:#94a3b8;font-size:.85rem;display:block;text-align:center;">'
+      +'🤖 L\'IA réfléchit…</span>';
     return;
   }
 
@@ -655,26 +739,15 @@ function confirmEch(){
 }
 
 // ── Journal ──
-// Types : 'score' = toujours affiché | 'g','b','i','p' = détail seulement
 function addLog(msg,type){
-  // Mode minimum : on affiche UNIQUEMENT les scores (type 'score') et erreurs
   if(logMode==='min'&&type!=='score'&&type!=='b')return;
-
   const box=document.getElementById('logbox');
   const p=document.createElement('p');
   p.textContent=msg;
-  // 'score' = couleur verte comme 'g'
-  p.className={
-    score:'lg',
-    g:'lg',
-    b:'lb',
-    i:'li',
-    p:'lp'
-  }[type]||'';
+  p.className={score:'lg',g:'lg',b:'lb',i:'li',p:'lp'}[type]||'';
   box.prepend(p);
   while(box.children.length>40)box.removeChild(box.lastChild);
 }
-
 function setLog(mode){
   logMode=mode;
   document.getElementById('btn-ld').classList.toggle('on',mode==='detail');
@@ -682,17 +755,92 @@ function setLog(mode){
 }
 
 // =====================================================
+//  LOBBY — Configuration joueurs
+// =====================================================
+function buildPlayersConfig(){
+  const ct=document.getElementById('players-config');
+  ct.innerHTML='';
+
+  // S'assurer que playersConfig a le bon nombre d'entrées
+  while(playersConfig.length<nbPlayers){
+    const i=playersConfig.length;
+    playersConfig.push({
+      name: i===0?'Joueur':`IA ${i}`,
+      isAI: i>0
+    });
+  }
+  playersConfig=playersConfig.slice(0,nbPlayers);
+
+  playersConfig.forEach((cfg,i)=>{
+    const row=document.createElement('div');
+    row.className='player-row';
+
+    // Numéro
+    const num=document.createElement('div');
+    num.className='player-num';
+    num.textContent=i+1;
+
+    // Nom
+    const inp=document.createElement('input');
+    inp.className='player-name-inp';
+    inp.type='text';
+    inp.maxLength=12;
+    inp.placeholder=cfg.isAI?`IA ${i+1}`:`Joueur ${i+1}`;
+    inp.value=cfg.name;
+    inp.addEventListener('input',()=>{playersConfig[i].name=inp.value;});
+
+    // Toggle Humain / IA
+    const tog=document.createElement('div');
+    tog.className='type-toggle';
+
+    const btnH=document.createElement('button');
+    btnH.className='type-btn'+(cfg.isAI?'':' on');
+    btnH.textContent='👤';
+    btnH.title='Humain';
+
+    const btnAI=document.createElement('button');
+    btnAI.className='type-btn'+(cfg.isAI?' on':'');
+    btnAI.textContent='🤖';
+    btnAI.title='IA';
+
+    btnH.addEventListener('click',()=>{
+      playersConfig[i].isAI=false;
+      btnH.classList.add('on');
+      btnAI.classList.remove('on');
+      inp.placeholder=`Joueur ${i+1}`;
+      if(!inp.value||inp.value.startsWith('IA'))
+        {inp.value=`Joueur ${i+1}`;playersConfig[i].name=inp.value;}
+    });
+    btnAI.addEventListener('click',()=>{
+      playersConfig[i].isAI=true;
+      btnAI.classList.add('on');
+      btnH.classList.remove('on');
+      inp.placeholder=`IA ${i+1}`;
+      if(!inp.value||inp.value.startsWith('Joueur'))
+        {inp.value=`IA ${i+1}`;playersConfig[i].name=inp.value;}
+    });
+
+    tog.appendChild(btnH);
+    tog.appendChild(btnAI);
+    row.appendChild(num);
+    row.appendChild(inp);
+    row.appendChild(tog);
+    ct.appendChild(row);
+  });
+}
+
+// =====================================================
 //  INIT
 // =====================================================
 document.addEventListener('DOMContentLoaded',()=>{
 
+  // Construire coordonnées
   function buildCoords(){
     const cc=document.getElementById('cc');
     const cr=document.getElementById('cr');
     if(cc.children.length)return;
     for(let i=1;i<=15;i++){
-      const s=document.createElement('span');
-      s.textContent=i;cc.appendChild(s);
+      const s=document.createElement('span');s.textContent=i;cc.appendChild(s);
     }
     for(let i=0;i<15;i++){
       const s=document.createElement('span');
@@ -700,55 +848,80 @@ document.addEventListener('DOMContentLoaded',()=>{
     }
   }
 
-  document.getElementById('btn-jouer').addEventListener('click',()=>{
-    const pseudo=document.getElementById('inp-pseudo').value.trim()||'Joueur';
-    const mode=document.getElementById('inp-mode').value;
-    const players=mode==='solo'?[pseudo,'IA']:[pseudo,'Joueur 2'];
-    G=newGame(players);
-    document.getElementById('screen-lobby').style.display='none';
-    document.getElementById('screen-game').style.display='block';
-    buildCoords();
-    addLog('🎮 '+players.join(' vs ')+' — Bonne partie !','g');
-    addLog('📦 '+G.sac.length+' jetons dans le sac','i');
-    render();
+  // Boutons nombre de joueurs
+  document.querySelectorAll('.nb-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      nbPlayers=parseInt(btn.dataset.nb);
+      document.querySelectorAll('.nb-btn').forEach(b=>b.classList.remove('on'));
+      btn.classList.add('on');
+      buildPlayersConfig();
+    });
   });
 
+  // Config initiale
+  buildPlayersConfig();
+
+  // JOUER
+  document.getElementById('btn-jouer').addEventListener('click',()=>{
+    // Récupérer les noms depuis les inputs
+    document.querySelectorAll('.player-name-inp').forEach((inp,i)=>{
+      playersConfig[i].name=inp.value.trim()||
+        (playersConfig[i].isAI?`IA ${i+1}`:`Joueur ${i+1}`);
+    });
+
+    G=newGame(playersConfig.slice(0,nbPlayers));
+
+    document.getElementById('screen-lobby').style.display='none';
+    document.getElementById('screen-game').style.display='block';
+
+    buildCoords();
+    addLog('🎮 '+G.joueurs.map(j=>j.name).join(' vs ')+' — Bonne partie !','g');
+    addLog('📦 '+G.sac.length+' jetons dans le sac','i');
+    render();
+
+    // Si le 1er joueur est une IA
+    if(G.joueurs[0].isAI)setTimeout(aiTurn,800);
+  });
+
+  // VALIDER
   document.getElementById('btn-valider').addEventListener('click',()=>{
     if(!G||G.over)return;
     if(G.joueurs[G.cur].isAI){addLog('Ce n\'est pas votre tour','b');return;}
     playMove();
   });
 
+  // ANNULER
   document.getElementById('btn-annuler').addEventListener('click',()=>{
     if(!G)return;
     G.pend=[];selIdx=null;render();
   });
 
+  // ÉCHANGER
   document.getElementById('btn-echanger').addEventListener('click',()=>{
     if(!G||G.over)return;
     openEch();
   });
 
-  document.getElementById('btn-quitter').addEventListener('click',()=>{
-    location.reload();
-  });
+  // QUITTER
+  document.getElementById('btn-quitter').addEventListener('click',()=>location.reload());
 
+  // JOKER annuler
   document.getElementById('btn-joker-cancel').addEventListener('click',()=>{
     document.getElementById('modal-joker').classList.remove('on');
     jokerCB=null;selIdx=null;
     if(G)render();
   });
 
+  // ÉCHANGE
   document.getElementById('btn-ech-ok').addEventListener('click',confirmEch);
   document.getElementById('btn-ech-no').addEventListener('click',()=>{
-    document.getElementById('modal-ech').classList.remove('on');
-    echSel=[];
+    document.getElementById('modal-ech').classList.remove('on');echSel=[];
   });
 
-  document.getElementById('btn-rejouer').addEventListener('click',()=>{
-    location.reload();
-  });
+  // FIN
+  document.getElementById('btn-rejouer').addEventListener('click',()=>location.reload());
 
+  // JOURNAL
   document.getElementById('btn-ld').addEventListener('click',()=>setLog('detail'));
   document.getElementById('btn-lm').addEventListener('click',()=>setLog('min'));
 });
