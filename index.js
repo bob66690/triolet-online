@@ -238,35 +238,32 @@ function calcPoints(){
   const lines=affectedLines();
   const hasJok=G.pend.some(p=>p.isJoker);
 
-  // ── 1 seul jeton sans voisin ──
+  // ── Cas : 1 seul jeton posé sans voisin ──
   if(G.pend.length===1&&lines.length===0){
     const p=G.pend[0];
     const sp=specAt(p.r,p.c);
-    // Si c'est un joker seul → vaut 0 de toute façon
     const sv=scoreVal({val:p.val,isJoker:p.isJoker,jokerVal:p.jokerVal});
 
     if(sp==='C'||sp==='D'){
-      // Joker sur case ×2 → 0×2 = 0 ; jeton normal → val×2
       const pts=sv*2;
       G.usedSp.add(p.r+','+p.c);
       total+=pts;
-      if(p.isJoker)
-        addLog(`Joker sur case ×2 : 0 × 2 = 0 pt (joker = 0 en décompte)`,'p');
-      else
-        addLog(`Case ×2 : ${sv} × 2 = ${pts} pts`,'p');
+      addLog(p.isJoker
+        ?`Joker sur ×2 : 0×2 = 0 pt`
+        :`Case ×2 : ${sv}×2 = ${pts} pts`,'p');
     }else if(sp==='T'){
       const pts=sv*3;
       G.usedSp.add(p.r+','+p.c);
       total+=pts;
-      if(p.isJoker)
-        addLog(`Joker sur case ×3 : 0 × 3 = 0 pt (joker = 0 en décompte)`,'p');
-      else
-        addLog(`Case ×3 : ${sv} × 3 = ${pts} pts`,'p');
+      addLog(p.isJoker
+        ?`Joker sur ×3 : 0×3 = 0 pt`
+        :`Case ×3 : ${sv}×3 = ${pts} pts`,'p');
     }else{
       addLog(`Jeton posé seul — 0 pt`,'i');
     }
     if(sp==='R'){
-      G.usedSp.add(p.r+','+p.c);G.rejouer=true;
+      G.usedSp.add(p.r+','+p.c);
+      G.rejouer=true;
       addLog('🔁 Case Rejouer !','g');
     }
     return total;
@@ -285,51 +282,71 @@ function calcPoints(){
     });
   }
 
-  // ── Paires et Trios ──
+  // ── Calcul ligne par ligne ──
   lines.forEach((line,lineIdx)=>{
     const len=line.length;
-
-    // Valeurs effectives (pour vérifier trio = 15)
     const evVals=line.map(l=>ev(l.tok));
     const evSum=evVals.reduce((a,b)=>a+b,0);
 
-    // Multiplicateur case spéciale
-    let mult=1,spKey=null;
-    for(const p of G.pend){
-      if(!line.some(l=>l.r===p.r&&l.c===p.c))continue;
-      const sp=specAt(p.r,p.c);
-      if(sp==='D'||sp==='C'){mult=2;spKey=p.r+','+p.c;break;}
-      if(sp==='T'){mult=3;spKey=p.r+','+p.c;break;}
-    }
-
     if(len===3&&evSum===15){
-      // TRIO = 30 × mult (le joker ne modifie pas la valeur du trio)
-      let pts=30*mult;
-      let msg=`Trio (${evVals.join('+')}=15) ×${mult} = ${30*mult}`;
+      // ════════════════════════════════════════
+      //  TRIO — règle officielle :
+      //  Le trio vaut 30 pts de base.
+      //  Si UN des jetons posés est sur case ×2 → 30×2 = 60
+      //  Si UN des jetons posés est sur case ×3 → 30×3 = 90
+      //  La case spéciale s'applique au TRIO ENTIER (pas au jeton seul)
+      //  Un seul multiplicateur par trio (le plus grand disponible)
+      // ════════════════════════════════════════
+      let mult=1;
+      let spKey=null;
 
-      if(hasJok){
-        msg+=' (joker inclus, pas de bonus triolet)';
+      // Chercher la meilleure case spéciale parmi les jetons
+      // NOUVEAUX de cette ligne (au choix du joueur → on prend le max)
+      for(const p of G.pend){
+        if(!line.some(l=>l.r===p.r&&l.c===p.c))continue;
+        const sp=specAt(p.r,p.c);
+        if((sp==='D'||sp==='C')&&mult<2){
+          mult=2;spKey=p.r+','+p.c;
+        }
+        if(sp==='T'&&mult<3){
+          mult=3;spKey=p.r+','+p.c;
+        }
       }
 
-      // Bonus triolet : seulement si pas de joker
+      let pts=30*mult;
+      let msg=`Trio (${evVals.join('+')}=15)`;
+      if(mult>1) msg+=` sur case ×${mult}`;
+      msg+=` = ${30*mult} pts`;
+
+      // Bonus Triolet (seulement si pas de joker)
       if(isTriolet&&lineIdx===trioletLineId&&!hasJok){
         pts+=50;
-        msg=`🎉 TRIOLET ! ${msg} + 50 = ${pts}`;
+        msg=`🎉 TRIOLET ! ${msg} + 50 bonus = ${pts} pts`;
+      }else if(hasJok){
+        msg+=` (joker inclus — pas de bonus triolet)`;
       }
 
+      // Marquer la case spéciale comme utilisée
       if(spKey)G.usedSp.add(spKey);
+
       total+=pts;
       addLog(msg,'p');
 
     }else if(len===2){
-      // PAIRE : score = somme des scoreVal (joker = 0)
-      // La case spéciale s'applique sur le scoreVal du jeton posé
-      // (si joker → scoreVal=0 donc case spéciale ne change rien)
+      // ════════════════════════════════════════
+      //  PAIRE — règle officielle :
+      //  Somme des scoreVal (joker = 0)
+      //  La case spéciale s'applique UNIQUEMENT
+      //  sur la valeur du jeton nouvellement posé
+      //  (pas sur la somme totale)
+      // ════════════════════════════════════════
       let pts=0;
-      let detail=[];
+      const detail=[];
+
       line.forEach(item=>{
         const sv=scoreVal(item.tok); // 0 si joker
         const isNew=G.pend.some(p=>p.r===item.r&&p.c===item.c);
+
         if(isNew){
           const sp=specAt(item.r,item.c);
           if(sp==='D'||sp==='C'){
@@ -345,19 +362,23 @@ function calcPoints(){
             detail.push(item.tok.isJoker?`X(=0)`:`${sv}`);
           }
         }else{
+          // Jeton déjà en place : sa valeur brute (scoreVal)
           pts+=sv;
           detail.push(`${sv}`);
         }
       });
+
       total+=pts;
-      addLog(`Paire (${detail.join('+')}) → ${pts} pts`,'i');
+      addLog(`Paire (${detail.join('+')} = ${pts} pts)`,'i');
     }
+    // len===1 seul dans une ligne : pas de points (déjà géré plus haut)
   });
 
-  // Case Rejouer
+  // ── Case Rejouer ──
   G.pend.forEach(p=>{
     if(specAt(p.r,p.c)==='R'){
-      G.usedSp.add(p.r+','+p.c);G.rejouer=true;
+      G.usedSp.add(p.r+','+p.c);
+      G.rejouer=true;
       addLog('🔁 Case Rejouer !','g');
     }
   });
