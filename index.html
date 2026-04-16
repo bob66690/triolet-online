@@ -71,6 +71,76 @@ header h1{
 }
 .field:focus{outline:none;border-color:#f59e0b;}
 
+/* Boutons nombre de joueurs */
+.nb-btn{
+  flex:1;
+  padding:10px;
+  border:2px solid #334155;
+  border-radius:8px;
+  background:#0f172a;
+  color:#94a3b8;
+  font-size:1.1rem;
+  font-weight:700;
+  cursor:pointer;
+  transition:all .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.nb-btn.on{
+  background:#f59e0b;
+  color:#1a1a1a;
+  border-color:#f59e0b;
+}
+
+/* Config joueurs */
+.player-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:10px;
+}
+.player-num{
+  width:28px;height:28px;
+  border-radius:50%;
+  background:#334155;
+  color:#fbbf24;
+  font-weight:700;
+  font-size:.85rem;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.player-name-inp{
+  flex:1;
+  padding:8px 12px;
+  border-radius:8px;
+  border:1px solid #334155;
+  background:#0f172a;
+  color:#e2e8f0;
+  font-size:.9rem;
+}
+.player-name-inp:focus{outline:none;border-color:#f59e0b;}
+.type-toggle{
+  display:flex;
+  border-radius:8px;
+  overflow:hidden;
+  border:1px solid #334155;
+  flex-shrink:0;
+}
+.type-btn{
+  padding:7px 10px;
+  border:none;
+  background:#0f172a;
+  color:#94a3b8;
+  font-size:.75rem;
+  font-weight:700;
+  cursor:pointer;
+  transition:all .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.type-btn.on{
+  background:#3b82f6;
+  color:#fff;
+}
+
 /* ===== BOUTONS GÉNÉRAUX ===== */
 .btn{
   border:none;
@@ -94,7 +164,6 @@ header h1{
   display:none;
   padding:8px;
 }
-
 .game-wrap{
   display:flex;
   gap:10px;
@@ -111,7 +180,6 @@ header h1{
   gap:8px;
   flex-shrink:0;
 }
-
 .board-shell{
   background:#0f2a5e;
   border-radius:4px;
@@ -210,7 +278,7 @@ header h1{
   filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));
 }
 
-/* Jetons plateau */
+/* ===== JETONS PLATEAU ===== */
 .tok{
   width:calc(var(--cs) - 4px);
   height:calc(var(--cs) - 4px);
@@ -238,23 +306,23 @@ header h1{
   box-shadow:0 0 6px rgba(34,197,94,.5),inset 0 1px 0 rgba(255,255,255,.5);
   cursor:pointer;
 }
+/* Valeur joker dans l'angle — plus grande */
 .tok .jcorner{
   position:absolute;
   bottom:1px;right:2px;
-  font-size:calc(var(--cs) * .22);
+  font-size:calc(var(--cs) * .30);
   font-weight:900;
   color:#1a1a1a;
   font-style:normal;
   line-height:1;
-  background:rgba(255,255,255,.85);
+  background:rgba(255,255,255,.9);
   border-radius:2px;
   padding:0 2px;
+  min-width:calc(var(--cs) * .28);
+  text-align:center;
 }
 
-/* ===================================================
-   BLOC CHEVALET + BOUTONS
-   Tout dans un seul bloc arrondi
-   =================================================== */
+/* ===== BLOC CHEVALET + BOUTONS ===== */
 .hand-block{
   background:#1e293b;
   border:1px solid #334155;
@@ -265,7 +333,6 @@ header h1{
   flex-direction:column;
   gap:10px;
 }
-
 .hand-info{
   font-size:.78rem;
   color:#94a3b8;
@@ -276,7 +343,6 @@ header h1{
   justify-content:space-between;
 }
 .hand-info strong{color:#fbbf24;}
-
 .hand-tokens{
   display:flex;
   gap:8px;
@@ -285,14 +351,11 @@ header h1{
   min-height:54px;
   align-items:center;
 }
-
-/* Séparateur */
 .hand-sep{
   height:1px;
   background:#334155;
-  margin:0 -12px; /* déborde sur les bords du bloc */
+  margin:0 -12px;
 }
-
 /* 4 boutons en ligne */
 .action-row{
   display:grid;
@@ -495,19 +558,23 @@ header h1{
 
 <!-- ========== LOBBY ========== -->
 <div id="screen-lobby">
+
   <div class="card">
-    <div class="card-title">👤 Votre profil</div>
-    <input id="inp-pseudo" class="field" type="text"
-           placeholder="Votre pseudo..." maxlength="15" value="Joueur"/>
-  </div>
-  <div class="card">
-    <div class="card-title">🎮 Mode de jeu</div>
-    <select id="inp-mode" class="field">
-      <option value="solo">Solo vs IA</option>
-      <option value="local">2 Joueurs (même écran)</option>
-    </select>
+    <div class="card-title">🎮 Configuration des joueurs</div>
+
+    <label style="color:#94a3b8;font-size:.85rem;display:block;margin-bottom:6px;">
+      Nombre de joueurs (2 à 4)
+    </label>
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <button class="nb-btn on" data-nb="2">2</button>
+      <button class="nb-btn"    data-nb="3">3</button>
+      <button class="nb-btn"    data-nb="4">4</button>
+    </div>
+
+    <div id="players-config"></div>
+
     <button id="btn-jouer" class="btn btn-green"
-            style="width:100%;padding:13px;font-size:.95rem;margin-top:4px;">
+            style="width:100%;padding:13px;font-size:.95rem;margin-top:8px;">
       ▶ &nbsp;JOUER
     </button>
   </div>
@@ -517,10 +584,9 @@ header h1{
 <div id="screen-game">
   <div class="game-wrap">
 
-    <!-- Gauche : plateau + bloc chevalet/boutons -->
+    <!-- Plateau + chevalet -->
     <div class="board-zone">
 
-      <!-- Plateau -->
       <div class="board-shell">
         <div class="board-grid-wrap">
           <div class="coord-corner"></div>
@@ -530,33 +596,25 @@ header h1{
         </div>
       </div>
 
-      <!-- Bloc chevalet + boutons (tout ensemble) -->
+      <!-- Bloc chevalet + boutons -->
       <div class="hand-block">
-
-        <!-- Info tour + sac -->
         <div class="hand-info">
           <span>🎴 <strong id="turn-name">-</strong></span>
           <span>🎒 Sac : <strong id="sac-ct">80</strong></span>
         </div>
-
-        <!-- Jetons -->
         <div id="hand-tokens" class="hand-tokens"></div>
-
-        <!-- Séparateur -->
         <div class="hand-sep"></div>
-
-        <!-- 4 boutons en ligne -->
         <div class="action-row">
           <button id="btn-valider"  class="btn btn-green">✅ Valider</button>
           <button id="btn-annuler"  class="btn btn-gray" >↩ Annuler</button>
           <button id="btn-echanger" class="btn btn-blue" >🔄 Échange</button>
           <button id="btn-quitter"  class="btn btn-red"  >🚪 Quitter</button>
         </div>
-
       </div>
+
     </div>
 
-    <!-- Droite : scores + journal -->
+    <!-- Panel droit -->
     <div class="side-panel">
 
       <div class="pcard">
@@ -618,5 +676,3 @@ header h1{
 <script src="index.js"></script>
 </body>
 </html>
-
-
