@@ -1,678 +1,1266 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
-<title>Triolet Online</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Triolet Online - Jeu de plateau</title>
+    <style>
+        :root {
+            --bg-color: #1a1d29;
+            --panel-bg: #242838;
+            --text-color: #e0e6ed;
+            --accent: #4a90e2;
+            --accent-hover: #357abd;
+            --success: #27ae60;
+            --warning: #f39c12;
+            --danger: #e74c3c;
+            --tile-bg: #f4e4c1;
+            --tile-text: #2c3e50;
+            --board-bg: #2c3e50;
+            --cell-border: #34495e;
+            --special-x2: #3498db;
+            --special-x3: #27ae60;
+            --special-replay: #9b59b6;
+            --special-center: #e67e22;
+        }
 
-body{
-  background:#0f172a;
-  color:#e2e8f0;
-  font-family:'Segoe UI',system-ui,sans-serif;
-  min-height:100vh;
-  overflow-x:hidden;
-}
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-/* ===== HEADER ===== */
-header{
-  background:#1e293b;
-  padding:10px 20px;
-  border-bottom:3px solid #f59e0b;
-  display:flex;
-  align-items:center;
-  gap:10px;
-  position:sticky;
-  top:0;
-  z-index:50;
-}
-.logo{
-  width:30px;height:30px;
-  background:linear-gradient(135deg,#f59e0b,#d97706);
-  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
-  flex-shrink:0;
-}
-header h1{
-  font-size:clamp(1.1rem,3vw,1.6rem);
-  font-weight:800;
-  color:#f59e0b;
-}
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
 
-/* ===== LOBBY ===== */
-#screen-lobby{
-  max-width:420px;
-  margin:30px auto;
-  padding:0 16px;
-}
-.card{
-  background:#1e293b;
-  border-radius:12px;
-  padding:20px;
-  margin-bottom:16px;
-  border:1px solid #334155;
-}
-.card-title{
-  color:#fbbf24;
-  font-weight:700;
-  margin-bottom:14px;
-  font-size:1rem;
-}
-.field{
-  width:100%;
-  padding:11px 14px;
-  border-radius:8px;
-  border:1px solid #334155;
-  background:#0f172a;
-  color:#e2e8f0;
-  font-size:1rem;
-  margin-bottom:10px;
-  -webkit-appearance:none;
-}
-.field:focus{outline:none;border-color:#f59e0b;}
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
 
-/* Boutons nombre de joueurs */
-.nb-btn{
-  flex:1;
-  padding:10px;
-  border:2px solid #334155;
-  border-radius:8px;
-  background:#0f172a;
-  color:#94a3b8;
-  font-size:1.1rem;
-  font-weight:700;
-  cursor:pointer;
-  transition:all .15s;
-  -webkit-tap-highlight-color:transparent;
-}
-.nb-btn.on{
-  background:#f59e0b;
-  color:#1a1a1a;
-  border-color:#f59e0b;
-}
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: var(--panel-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
 
-/* Config joueurs */
-.player-row{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  margin-bottom:10px;
-}
-.player-num{
-  width:28px;height:28px;
-  border-radius:50%;
-  background:#334155;
-  color:#fbbf24;
-  font-weight:700;
-  font-size:.85rem;
-  display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;
-}
-.player-name-inp{
-  flex:1;
-  padding:8px 12px;
-  border-radius:8px;
-  border:1px solid #334155;
-  background:#0f172a;
-  color:#e2e8f0;
-  font-size:.9rem;
-}
-.player-name-inp:focus{outline:none;border-color:#f59e0b;}
-.type-toggle{
-  display:flex;
-  border-radius:8px;
-  overflow:hidden;
-  border:1px solid #334155;
-  flex-shrink:0;
-}
-.type-btn{
-  padding:7px 10px;
-  border:none;
-  background:#0f172a;
-  color:#94a3b8;
-  font-size:.75rem;
-  font-weight:700;
-  cursor:pointer;
-  transition:all .15s;
-  -webkit-tap-highlight-color:transparent;
-}
-.type-btn.on{
-  background:#3b82f6;
-  color:#fff;
-}
+        h1 {
+            color: var(--accent);
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
 
-/* ===== BOUTONS GÉNÉRAUX ===== */
-.btn{
-  border:none;
-  border-radius:8px;
-  font-weight:700;
-  cursor:pointer;
-  transition:opacity .15s,transform .15s;
-  text-transform:uppercase;
-  letter-spacing:.4px;
-  -webkit-tap-highlight-color:transparent;
-  white-space:nowrap;
-}
-.btn:active{opacity:.8;transform:scale(.97);}
-.btn-green{background:#22c55e;color:#fff;}
-.btn-gray {background:#475569;color:#fff;}
-.btn-blue {background:#3b82f6;color:#fff;}
-.btn-red  {background:#ef4444;color:#fff;}
+        .subtitle {
+            opacity: 0.8;
+            font-size: 0.9em;
+        }
 
-/* ===== ÉCRAN JEU ===== */
-#screen-game{
-  display:none;
-  padding:8px;
-}
-.game-wrap{
-  display:flex;
-  gap:10px;
-  align-items:flex-start;
-  justify-content:center;
-  flex-wrap:wrap;
-}
+        .game-layout {
+            display: grid;
+            grid-template-columns: 250px 1fr 300px;
+            gap: 20px;
+            align-items: start;
+        }
 
-/* ===== ZONE PLATEAU ===== */
-.board-zone{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:8px;
-  flex-shrink:0;
-}
-.board-shell{
-  background:#0f2a5e;
-  border-radius:4px;
-  padding:3px;
-  box-shadow:0 8px 32px rgba(0,0,0,.6);
-  display:inline-block;
-}
-.board-grid-wrap{
-  display:grid;
-  grid-template-columns:var(--lbl) auto;
-  grid-template-rows:var(--lbl) auto;
-}
-.coord-corner{
-  width:var(--lbl);height:var(--lbl);
-  background:#0f2a5e;
-}
-.coord-cols{
-  display:flex;
-  background:#0f2a5e;
-}
-.coord-cols span{
-  width:var(--cs);
-  text-align:center;
-  font-size:var(--csf);
-  color:#7dd3fc;
-  font-weight:600;
-  line-height:var(--lbl);
-}
-.coord-rows{
-  display:flex;
-  flex-direction:column;
-  background:#0f2a5e;
-}
-.coord-rows span{
-  height:var(--cs);
-  width:var(--lbl);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:var(--csf);
-  color:#7dd3fc;
-  font-weight:600;
-}
-#board{
-  display:grid;
-  grid-template-columns:repeat(15,var(--cs));
-  grid-template-rows:repeat(15,var(--cs));
-  gap:1px;
-  background:#0a1f4a;
-}
-.cell{
-  width:var(--cs);height:var(--cs);
-  background:#1e4080;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  cursor:pointer;
-  position:relative;
-  transition:background .1s;
-  border-radius:1px;
-  -webkit-tap-highlight-color:transparent;
-  overflow:hidden;
-}
-.cell:hover{background:#28509a;}
-.cell.sp-R{background:#6d28d9;}
-.cell.sp-D{background:#2563eb;}
-.cell.sp-T{background:#16a34a;}
-.cell.sp-C{background:#d97706;}
-.cell.placeable{
-  background:#14532d !important;
-  box-shadow:inset 0 0 0 2px #4ade80;
-}
-.cell.placeable:hover{background:#166534 !important;}
+        @media (max-width: 1024px) {
+            .game-layout {
+                grid-template-columns: 1fr;
+            }
+        }
 
-/* Labels cases spéciales */
-.cell-lbl{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  width:100%;height:100%;
-  pointer-events:none;
-  user-select:none;
-}
-.cell-lbl-text{
-  font-size:calc(var(--cs) * .36);
-  font-weight:900;
-  color:rgba(255,255,255,.97);
-  text-shadow:0 1px 3px rgba(0,0,0,.7);
-  line-height:1;
-  letter-spacing:-.5px;
-}
-.cell-lbl svg{
-  width:calc(var(--cs) * .58);
-  height:calc(var(--cs) * .58);
-  filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));
-}
+        .panel {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
 
-/* ===== JETONS PLATEAU ===== */
-.tok{
-  width:calc(var(--cs) - 4px);
-  height:calc(var(--cs) - 4px);
-  background:linear-gradient(145deg,#fef9e7,#f5d76e);
-  border-radius:3px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  color:#1a1a1a;
-  font-weight:900;
-  font-size:calc(var(--cs) * .4);
-  border:1.5px solid #c9a227;
-  box-shadow:0 2px 4px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.5);
-  position:relative;
-  user-select:none;
-  line-height:1;
-}
-.tok.joker{
-  background:linear-gradient(145deg,#fff3e0,#ffcc80);
-  color:#dc2626;
-  font-weight:900;
-}
-.tok.pending{
-  border:2px solid #22c55e;
-  box-shadow:0 0 6px rgba(34,197,94,.5),inset 0 1px 0 rgba(255,255,255,.5);
-  cursor:pointer;
-}
-/* Valeur joker dans l'angle — plus grande */
-.tok .jcorner{
-  position:absolute;
-  bottom:1px;right:2px;
-  font-size:calc(var(--cs) * .30);
-  font-weight:900;
-  color:#1a1a1a;
-  font-style:normal;
-  line-height:1;
-  background:rgba(255,255,255,.9);
-  border-radius:2px;
-  padding:0 2px;
-  min-width:calc(var(--cs) * .28);
-  text-align:center;
-}
+        .board-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
 
-/* ===== BLOC CHEVALET + BOUTONS ===== */
-.hand-block{
-  background:#1e293b;
-  border:1px solid #334155;
-  border-radius:12px;
-  padding:12px;
-  width:100%;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-.hand-info{
-  font-size:.78rem;
-  color:#94a3b8;
-  display:flex;
-  flex-wrap:wrap;
-  gap:6px;
-  align-items:center;
-  justify-content:space-between;
-}
-.hand-info strong{color:#fbbf24;}
-.hand-tokens{
-  display:flex;
-  gap:8px;
-  justify-content:center;
-  flex-wrap:wrap;
-  min-height:54px;
-  align-items:center;
-}
-.hand-sep{
-  height:1px;
-  background:#334155;
-  margin:0 -12px;
-}
-/* 4 boutons en ligne */
-.action-row{
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:6px;
-}
-.action-row .btn{
-  padding:10px 4px;
-  font-size:clamp(.6rem,.8vw,.78rem);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:3px;
-}
+        #board {
+            display: grid;
+            grid-template-columns: repeat(15, 40px);
+            grid-template-rows: repeat(15, 40px);
+            gap: 1px;
+            background: var(--cell-border);
+            border: 3px solid var(--accent);
+            border-radius: 8px;
+            padding: 5px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+        }
 
-/* Jetons chevalet */
-.htok{
-  width:52px;height:52px;
-  background:linear-gradient(145deg,#fef9e7,#f5d76e);
-  border-radius:7px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  color:#1a1a1a;
-  font-weight:900;
-  font-size:1.25rem;
-  border:2px solid transparent;
-  cursor:pointer;
-  box-shadow:0 3px 6px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.5);
-  transition:transform .15s,box-shadow .15s,border-color .15s;
-  -webkit-tap-highlight-color:transparent;
-  user-select:none;
-}
-.htok:hover{
-  transform:translateY(-4px);
-  box-shadow:0 6px 12px rgba(0,0,0,.3);
-}
-.htok.sel{
-  border-color:#22c55e;
-  transform:translateY(-7px);
-  box-shadow:0 0 0 3px rgba(34,197,94,.35),0 8px 14px rgba(0,0,0,.3);
-}
-.htok.joker{
-  background:linear-gradient(145deg,#fff3e0,#ffcc80);
-  color:#dc2626;
-  font-weight:900;
-}
-.htok.ghost{
-  background:#0f172a;
-  box-shadow:inset 0 2px 4px rgba(0,0,0,.4);
-  cursor:default;
-  border-color:#334155;
-}
-.htok.ghost:hover{transform:none;box-shadow:inset 0 2px 4px rgba(0,0,0,.4);}
+        @media (max-width: 768px) {
+            #board {
+                grid-template-columns: repeat(15, 25px);
+                grid-template-rows: repeat(15, 25px);
+            }
+        }
 
-/* ===== PANEL DROIT ===== */
-.side-panel{
-  width:250px;
-  flex-shrink:0;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-.pcard{
-  background:#1e293b;
-  border-radius:10px;
-  padding:14px;
-  border:1px solid #334155;
-}
-.ptitle{
-  font-size:.78rem;
-  font-weight:700;
-  color:#fbbf24;
-  text-transform:uppercase;
-  letter-spacing:.6px;
-  margin-bottom:10px;
-}
-.srow{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  padding:7px 0;
-  border-bottom:1px solid #334155;
-  font-size:.9rem;
-}
-.srow:last-child{border-bottom:none;}
-.srow .pts{font-size:1.15rem;font-weight:800;color:#fbbf24;}
-.srow .cur{color:#22c55e;font-weight:700;}
+        .cell {
+            background: var(--board-bg);
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
 
-/* Journal */
-.log-head{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:8px;
-}
-.log-toggle{display:flex;gap:5px;}
-.ltbtn{
-  padding:3px 10px;
-  border:none;border-radius:12px;
-  font-size:.7rem;cursor:pointer;
-  background:#334155;color:#94a3b8;font-weight:600;
-  transition:background .15s;
-}
-.ltbtn.on{background:#22c55e;color:#fff;}
-#logbox{
-  background:#0f172a;
-  border-radius:6px;
-  padding:8px;
-  max-height:200px;
-  overflow-y:auto;
-  font-size:.78rem;
-  border:1px solid #334155;
-}
-#logbox p{margin-bottom:4px;line-height:1.4;}
-.lg{color:#4ade80;}
-.lb{color:#f87171;}
-.li{color:#93c5fd;}
-.lp{color:#fbbf24;font-weight:700;}
+        @media (max-width: 768px) {
+            .cell {
+                font-size: 10px;
+            }
+        }
 
-/* ===== MODALS ===== */
-.overlay{
-  display:none;
-  position:fixed;inset:0;
-  background:rgba(0,0,0,.78);
-  backdrop-filter:blur(3px);
-  z-index:200;
-  align-items:center;
-  justify-content:center;
-  padding:16px;
-}
-.overlay.on{display:flex;}
-.modal{
-  background:#1e293b;
-  border-radius:14px;
-  padding:22px;
-  width:100%;max-width:340px;
-  border:1px solid #475569;
-  box-shadow:0 25px 50px rgba(0,0,0,.6);
-}
-.modal h2{color:#fbbf24;text-align:center;margin-bottom:10px;font-size:1.15rem;}
-.modal .sub{color:#94a3b8;text-align:center;font-size:.88rem;margin-bottom:14px;}
-.jgrid{
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:7px;margin-bottom:14px;
-}
-.jval{
-  padding:11px 4px;
-  background:#334155;border-radius:7px;
-  text-align:center;cursor:pointer;
-  font-weight:700;font-size:.95rem;
-  transition:background .15s,transform .1s;
-  -webkit-tap-highlight-color:transparent;
-}
-.jval:hover,.jval:active{background:#f59e0b;color:#1a1a1a;transform:scale(1.08);}
-.finrow{
-  display:flex;justify-content:space-between;
-  padding:8px 0;border-bottom:1px solid #334155;font-size:.95rem;
-}
-.finrow:last-child{border-bottom:none;}
-.finpts{font-weight:800;color:#fbbf24;}
+        .cell:hover:not(.occupied) {
+            background: var(--accent);
+            opacity: 0.6;
+        }
 
-/* ===== RESPONSIVE ===== */
-:root{
-  --cs:38px;
-  --lbl:22px;
-  --csf:.68rem;
-}
-@media(max-width:1100px){
-  :root{--cs:34px;--lbl:20px;--csf:.62rem;}
-}
-@media(max-width:900px){
-  :root{--cs:30px;--lbl:18px;--csf:.58rem;}
-  .side-panel{width:100%;max-width:620px;}
-  .game-wrap{flex-direction:column;align-items:center;}
-}
-@media(max-width:680px){
-  :root{--cs:26px;--lbl:16px;--csf:.52rem;}
-  .htok{width:46px;height:46px;font-size:1.05rem;}
-}
-@media(max-width:520px){
-  :root{--cs:22px;--lbl:14px;--csf:.46rem;}
-  .htok{width:42px;height:42px;font-size:.95rem;}
-  .action-row .btn{font-size:.6rem;padding:9px 2px;}
-}
-@media(max-width:420px){
-  :root{--cs:19px;--lbl:13px;--csf:.42rem;}
-  .htok{width:38px;height:38px;font-size:.88rem;}
-  .action-row .btn{font-size:.55rem;padding:8px 2px;}
-}
-</style>
+        .cell.occupied {
+            background: var(--tile-bg);
+            color: var(--tile-text);
+            cursor: default;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .cell.temp {
+            background: #ffeaa7;
+            color: #2d3436;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .cell.special-x2 {
+            background: var(--special-x2);
+            color: white;
+        }
+        .cell.special-x3 {
+            background: var(--special-x3);
+            color: white;
+        }
+        .cell.special-replay {
+            background: var(--special-replay);
+            color: white;
+        }
+        .cell.special-center {
+            background: var(--special-center);
+            color: white;
+        }
+        .cell.special-used {
+            opacity: 0.5;
+            background: #555 !important;
+        }
+
+        .cell .multiplier {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            font-size: 8px;
+            opacity: 0.8;
+        }
+
+        .tile {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--tile-bg);
+            color: var(--tile-text);
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: transform 0.2s;
+            position: relative;
+        }
+
+        .tile:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+        }
+
+        .tile.selected {
+            border: 3px solid var(--accent);
+            transform: translateY(-10px);
+        }
+
+        .tile-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .tile-count {
+            font-size: 10px;
+            opacity: 0.7;
+            position: absolute;
+            bottom: 2px;
+            right: 4px;
+        }
+
+        .tile.joker {
+            background: #2c3e50;
+            color: white;
+        }
+
+        .rack {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 12px;
+            min-height: 80px;
+        }
+
+        .rack-slot {
+            width: 60px;
+            height: 70px;
+            border: 2px dashed var(--cell-border);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .rack-slot .tile {
+            width: 100%;
+            height: 100%;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            background: var(--accent);
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+
+        button:hover:not(:disabled) {
+            background: var(--accent-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        button.secondary {
+            background: #34495e;
+        }
+
+        button.danger {
+            background: var(--danger);
+        }
+
+        button.success {
+            background: var(--success);
+        }
+
+        .info-section {
+            margin-bottom: 20px;
+        }
+
+        .info-section h3 {
+            color: var(--accent);
+            margin-bottom: 10px;
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 5px;
+        }
+
+        .score-display {
+            font-size: 2em;
+            text-align: center;
+            color: var(--success);
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .turn-info {
+            background: rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .current-player {
+            font-size: 1.2em;
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        .bag-info {
+            text-align: center;
+            font-size: 0.9em;
+            opacity: 0.8;
+            margin-top: 10px;
+        }
+
+        .rules {
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        .rules ul {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+
+        .rules li {
+            margin-bottom: 8px;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            background: var(--success);
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: none;
+            animation: slideIn 0.3s;
+            z-index: 1000;
+            max-width: 300px;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(400px); }
+            to { transform: translateX(0); }
+        }
+
+        .notification.error {
+            background: var(--danger);
+        }
+
+        .notification.warning {
+            background: var(--warning);
+            color: #000;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: var(--panel-bg);
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .modal h2 {
+            margin-bottom: 20px;
+            color: var(--accent);
+        }
+
+        .joker-input {
+            margin: 20px 0;
+        }
+
+        .joker-input input {
+            width: 100px;
+            padding: 10px;
+            font-size: 1.5em;
+            text-align: center;
+            border: 2px solid var(--accent);
+            border-radius: 6px;
+            background: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        .legend {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            font-size: 0.85em;
+            margin-top: 15px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: 1px solid white;
+        }
+
+        .history {
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 0.85em;
+            margin-top: 15px;
+        }
+
+        .history-item {
+            padding: 8px;
+            background: rgba(0,0,0,0.2);
+            margin-bottom: 5px;
+            border-radius: 4px;
+            border-left: 3px solid var(--accent);
+        }
+
+        .triolet-bonus {
+            color: gold;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
 
-<header>
-  <div class="logo"></div>
-  <h1>Triolet Online</h1>
-</header>
+<div class="container">
+    <header>
+        <h1>TRIOLET</h1>
+        <div class="subtitle">Le grand classique des jeux de chiffres - Version en ligne</div>
+    </header>
 
-<!-- ========== LOBBY ========== -->
-<div id="screen-lobby">
+    <div class="game-layout">
+        <!-- Panneau gauche : Infos et contrôles -->
+        <div class="left-panel">
+            <div class="panel">
+                <div class="info-section">
+                    <h3>🎮 Partie</h3>
+                    <div class="turn-info">
+                        <div>Tour de</div>
+                        <div class="current-player" id="currentPlayer">Joueur 1</div>
+                    </div>
+                    <div class="score-display" id="currentScore">0 pts</div>
+                    <div class="bag-info">
+                        Sac : <span id="bagCount">81</span> jetons
+                    </div>
+                </div>
 
-  <div class="card">
-    <div class="card-title">🎮 Configuration des joueurs</div>
+                <div class="controls">
+                    <button onclick="game.validateMove()" class="success">✓ Valider</button>
+                    <button onclick="game.cancelMove()" class="danger">✗ Annuler</button>
+                    <button onclick="game.exchangeTiles()" class="secondary">🔄 Échanger</button>
+                    <button onclick="showRules()" class="secondary">📜 Règles</button>
+                </div>
 
-    <label style="color:#94a3b8;font-size:.85rem;display:block;margin-bottom:6px;">
-      Nombre de joueurs (2 à 4)
-    </label>
-    <div style="display:flex;gap:8px;margin-bottom:16px;">
-      <button class="nb-btn on" data-nb="2">2</button>
-      <button class="nb-btn"    data-nb="3">3</button>
-      <button class="nb-btn"    data-nb="4">4</button>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: var(--special-center)"></div>
+                        <span>Départ (x2)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: var(--special-x2)"></div>
+                        <span>x2</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: var(--special-x3)"></div>
+                        <span>x3</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: var(--special-replay)"></div>
+                        <span>Rejouer</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel" style="margin-top: 20px;">
+                <h3>📊 Scores</h3>
+                <div id="scoresList">
+                    <!-- Rempli par JS -->
+                </div>
+                <div class="history" id="history">
+                    <!-- Historique des coups -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Centre : Plateau -->
+        <div class="board-container">
+            <div id="board"></div>
+            
+            <div class="rack" id="rack">
+                <!-- Chevalet du joueur -->
+            </div>
+            
+            <div style="margin-top: 10px; font-size: 0.9em; opacity: 0.8;">
+                Cliquez sur un jeton pour le sélectionner, puis sur une case du plateau pour le poser.
+            </div>
+        </div>
+
+        <!-- Panneau droit : Règles rapides -->
+        <div class="right-panel">
+            <div class="panel rules-container">
+                <h3>📖 Règles rapides</h3>
+                <div class="rules">
+                    <ul>
+                        <li><strong>But :</strong> Marquer le plus de points en posant des jetons.</li>
+                        <li><strong>1er coup :</strong> Obligatoirement sur la case centrale orange.</li>
+                        <li><strong>Connexité :</strong> Chaque nouveau jeton doit toucher un jeton existant.</li>
+                        <li><strong>Sommes :</strong>
+                            <ul>
+                                <li>2 jetons côte à côte : total ≤ 15</li>
+                                <li>3 jetons côte à côte (Trio) : total = 15 exactement</li>
+                            </ul>
+                        </li>
+                        <li><strong>Points :</strong>
+                            <ul>
+                                <li>2 jetons : valeur de la somme</li>
+                                <li>Trio (3=15) : 30 points</li>
+                                <li><span class="triolet-bonus">Triolet</span> (pose des 3 jetons d'un coup) : +50 points bonus</li>
+                            </ul>
+                        </li>
+                        <li><strong>Cases spéciales :</strong> x2 (bleu), x3 (vert), Rejouer (violet). Une seule utilisation par case.</li>
+                        <li><strong>Joker (X) :</strong> Compte pour la somme (valeur choisie 0-15) mais vaut 0 point. Max 1 par tour. Pas de bonus Triolet avec joker.</li>
+                        <li><strong>Échange :</strong> Possible si plus de 5 jetons dans le sac. Passe le tour.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
     </div>
-
-    <div id="players-config"></div>
-
-    <button id="btn-jouer" class="btn btn-green"
-            style="width:100%;padding:13px;font-size:.95rem;margin-top:8px;">
-      ▶ &nbsp;JOUER
-    </button>
-  </div>
 </div>
 
-<!-- ========== JEU ========== -->
-<div id="screen-game">
-  <div class="game-wrap">
+<!-- Notification -->
+<div class="notification" id="notification"></div>
 
-    <!-- Plateau + chevalet -->
-    <div class="board-zone">
-
-      <div class="board-shell">
-        <div class="board-grid-wrap">
-          <div class="coord-corner"></div>
-          <div class="coord-cols" id="cc"></div>
-          <div class="coord-rows" id="cr"></div>
-          <div id="board"></div>
+<!-- Modal pour Joker -->
+<div class="modal" id="jokerModal">
+    <div class="modal-content">
+        <h2>Valeur du Joker</h2>
+        <p>Choisissez la valeur de ce joker (0-15) :</p>
+        <div class="joker-input">
+            <input type="number" id="jokerValue" min="0" max="15" value="0">
         </div>
-      </div>
-
-      <!-- Bloc chevalet + boutons -->
-      <div class="hand-block">
-        <div class="hand-info">
-          <span>🎴 <strong id="turn-name">-</strong></span>
-          <span>🎒 Sac : <strong id="sac-ct">80</strong></span>
-        </div>
-        <div id="hand-tokens" class="hand-tokens"></div>
-        <div class="hand-sep"></div>
-        <div class="action-row">
-          <button id="btn-valider"  class="btn btn-green">✅ Valider</button>
-          <button id="btn-annuler"  class="btn btn-gray" >↩ Annuler</button>
-          <button id="btn-echanger" class="btn btn-blue" >🔄 Échange</button>
-          <button id="btn-quitter"  class="btn btn-red"  >🚪 Quitter</button>
-        </div>
-      </div>
-
+        <button onclick="confirmJoker()">Confirmer</button>
+        <button onclick="closeJokerModal()" class="secondary" style="margin-left: 10px;">Annuler</button>
     </div>
+</div>
 
-    <!-- Panel droit -->
-    <div class="side-panel">
-
-      <div class="pcard">
-        <div class="ptitle">🏆 Scores</div>
-        <div id="scores-list"></div>
-      </div>
-
-      <div class="pcard">
-        <div class="log-head">
-          <div class="ptitle" style="margin:0;">📋 Journal</div>
-          <div class="log-toggle">
-            <button class="ltbtn on" id="btn-ld">Détaillé</button>
-            <button class="ltbtn"    id="btn-lm">Minimum</button>
-          </div>
+<!-- Modal pour Règles complètes -->
+<div class="modal" id="rulesModal">
+    <div class="modal-content" style="max-width: 600px; max-height: 80vh; overflow-y: auto;">
+        <h2>Règles complètes du Triolet</h2>
+        <div style="text-align: left; line-height: 1.6;">
+            <h3>Matériel</h3>
+            <p>81 jetons numérotés (0 à 15), 2 jokers, plateau 15×15.</p>
+            
+            <h3>Déroulement</h3>
+            <p>Chaque joueur a 3 jetons en main. À son tour, il peut poser 1, 2 ou 3 jetons sur une même ligne ou colonne, accolés à des jetons existants (sauf premier coup).</p>
+            
+            <h3>Contraintes de somme</h3>
+            <ul>
+                <li>Deux jetons adjacents : leur somme doit être ≤ 15</li>
+                <li>Trois jetons adjacents (Trio) : leur somme doit être exactement 15</li>
+                <li>Interdit de créer une ligne de 4 jetons</li>
+            </ul>
+            
+            <h3>Comptage des points</h3>
+            <p>On ne compte que les nouveaux ensembles créés :</p>
+            <ul>
+                <li>Ensemble de 2 jetons : somme des valeurs</li>
+                <li>Trio (3 jetons = 15) : 30 points (15 + bonus 15)</li>
+                <li>Triolet : poser ses 3 jetons en un seul coup formant un Trio = +50 points bonus</li>
+            </ul>
+            
+            <h3>Cases spéciales</h3>
+            <ul>
+                <li><strong>Case double (x2) :</strong> Multiplie par 2 la valeur du jeton ou du Trio</li>
+                <li><strong>Case triple (x3) :</strong> Multiplie par 3</li>
+                <li><strong>Case Rejouer :</strong> Le joueur rejoue immédiatement après ce coup</li>
+            </ul>
+            
+            <h3>Fin de partie</h3>
+            <p>La partie se termine quand le sac est vide et qu'un joueur pose son dernier jeton. Il récupère alors la valeur des jetons restants chez les adversaires.</p>
         </div>
-        <div id="logbox"></div>
-      </div>
-
+        <button onclick="closeRules()" style="margin-top: 20px;">Fermer</button>
     </div>
-  </div>
 </div>
 
-<!-- MODAL JOKER -->
-<div class="overlay" id="modal-joker">
-  <div class="modal">
-    <h2>🃏 Valeur du Joker</h2>
-    <p class="sub">Quelle valeur (0-15) ce joker représente-t-il ?</p>
-    <div class="jgrid" id="jgrid"></div>
-    <button id="btn-joker-cancel" class="btn btn-gray"
-            style="width:100%;padding:11px;">Annuler</button>
-  </div>
-</div>
+<script>
+/**
+ * MOTEUR TRIOLET COMPLET
+ * Intégré dans le HTML pour GitHub Pages (pas de modules externes)
+ */
 
-<!-- MODAL ÉCHANGE -->
-<div class="overlay" id="modal-ech">
-  <div class="modal">
-    <h2>🔄 Échanger</h2>
-    <p class="sub">Sélectionnez 1 à 3 jetons à remettre dans le sac</p>
-    <div id="ech-toks"
-         style="display:flex;gap:8px;justify-content:center;
-                margin:12px 0;flex-wrap:wrap;min-height:56px;"></div>
-    <button id="btn-ech-ok" class="btn btn-green"
-            style="width:100%;padding:11px;margin-bottom:8px;">Confirmer</button>
-    <button id="btn-ech-no" class="btn btn-gray"
-            style="width:100%;padding:11px;">Annuler</button>
-  </div>
-</div>
+const BOARD_SIZE = 15;
+const CENTER = { x: 7, y: 7 };
 
-<!-- MODAL FIN -->
-<div class="overlay" id="modal-fin">
-  <div class="modal">
-    <h2>🎉 Fin de partie !</h2>
-    <div id="fin-scores" style="margin:16px 0;"></div>
-    <button id="btn-rejouer" class="btn btn-green"
-            style="width:100%;padding:13px;">Nouvelle partie</button>
-  </div>
-</div>
+const SPECIAL_CELLS = {
+    double: [
+        { x: 7, y: 7 }, { x: 3, y: 3 }, { x: 3, y: 11 },
+        { x: 11, y: 3 }, { x: 11, y: 11 }, { x: 0, y: 7 },
+        { x: 7, y: 0 }, { x: 7, y: 14 }, { x: 14, y: 7 },
+        { x: 2, y: 7 }, { x: 7, y: 2 }, { x: 7, y: 12 }, { x: 12, y: 7 }
+    ],
+    triple: [
+        { x: 5, y: 5 }, { x: 5, y: 9 },
+        { x: 9, y: 5 }, { x: 9, y: 9 }
+    ],
+    replay: [
+        { x: 1, y: 1 }, { x: 1, y: 13 },
+        { x: 13, y: 1 }, { x: 13, y: 13 }
+    ]
+};
 
-<script src="index.js"></script>
+const TILE_DISTRIBUTION = {
+    0: 5, 1: 6, 2: 6, 3: 6, 4: 6, 5: 6, 6: 6, 7: 6,
+    8: 6, 9: 6, 10: 6, 11: 3, 12: 3, 13: 3, 14: 3, 15: 3
+};
+
+class Tile {
+    constructor(value, isJoker = false) {
+        this.value = value;
+        this.isJoker = isJoker;
+        this.jokerValue = null;
+    }
+
+    getEffectiveValue() {
+        return this.isJoker ? (this.jokerValue !== null ? this.jokerValue : 0) : this.value;
+    }
+
+    getScoreValue() {
+        return this.isJoker ? 0 : this.value;
+    }
+
+    getDisplayValue() {
+        return this.isJoker ? 'X' : this.value;
+    }
+}
+
+class TrioletGame {
+    constructor() {
+        this.board = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
+        this.bag = [];
+        this.players = [];
+        this.currentPlayerIndex = 0;
+        this.firstMovePlayed = false;
+        this.usedSpecialCells = new Set();
+        this.tempPlacements = []; // Coup en cours
+        this.selectedTile = null;
+        
+        this.initBag();
+        this.initBoard();
+    }
+
+    initBag() {
+        for (let value = 0; value <= 15; value++) {
+            const count = TILE_DISTRIBUTION[value] || 0;
+            for (let i = 0; i < count; i++) {
+                this.bag.push(new Tile(value));
+            }
+        }
+        this.bag.push(new Tile(0, true));
+        this.bag.push(new Tile(0, true));
+        this.shuffleBag();
+    }
+
+    shuffleBag() {
+        for (let i = this.bag.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this.bag[i], this.bag[j]] = [this.bag[j], this.bag[i]];
+        }
+    }
+
+    drawTile() {
+        return this.bag.length > 0 ? this.bag.pop() : null;
+    }
+
+    addPlayer(name) {
+        const player = {
+            id: this.players.length + 1,
+            name: name,
+            rack: [],
+            score: 0
+        };
+        for (let i = 0; i < 3; i++) {
+            const tile = this.drawTile();
+            if (tile) player.rack.push(tile);
+        }
+        this.players.push(player);
+        return player;
+    }
+
+    initBoard() {
+        const boardEl = document.getElementById('board');
+        boardEl.innerHTML = '';
+        
+        for (let y = 0; y < BOARD_SIZE; y++) {
+            for (let x = 0; x < BOARD_SIZE; x++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.dataset.x = x;
+                cell.dataset.y = y;
+                
+                // Marquer les cases spéciales
+                if (x === CENTER.x && y === CENTER.y) {
+                    cell.classList.add('special-center');
+                    cell.innerHTML = '★<span class="multiplier">x2</span>';
+                } else if (SPECIAL_CELLS.double.some(c => c.x === x && c.y === y)) {
+                    cell.classList.add('special-x2');
+                    cell.innerHTML = '<span class="multiplier">x2</span>';
+                } else if (SPECIAL_CELLS.triple.some(c => c.x === x && c.y === y)) {
+                    cell.classList.add('special-x3');
+                    cell.innerHTML = '<span class="multiplier">x3</span>';
+                } else if (SPECIAL_CELLS.replay.some(c => c.x === x && c.y === y)) {
+                    cell.classList.add('special-replay');
+                    cell.innerHTML = '↻';
+                }
+                
+                cell.addEventListener('click', () => this.handleCellClick(x, y));
+                boardEl.appendChild(cell);
+            }
+        }
+    }
+
+    handleCellClick(x, y) {
+        if (!this.selectedTile) {
+            showNotification('Sélectionnez d\'abord un jeton de votre main', 'error');
+            return;
+        }
+
+        // Vérifier si case libre
+        if (this.board[y][x] !== null) {
+            showNotification('Case déjà occupée', 'error');
+            return;
+        }
+
+        // Vérifier si jeton déjà posé temporairement
+        const existing = this.tempPlacements.find(p => p.tile === this.selectedTile);
+        if (existing) {
+            // On déplace le jeton
+            existing.x = x;
+            existing.y = y;
+        } else {
+            this.tempPlacements.push({ x, y, tile: this.selectedTile });
+        }
+
+        this.render();
+    }
+
+    selectTile(index) {
+        const player = this.players[this.currentPlayerIndex];
+        if (index >= player.rack.length) return;
+        
+        // Si c'est un joker et qu'il n'a pas encore de valeur
+        const tile = player.rack[index];
+        if (tile.isJoker && tile.jokerValue === null) {
+            this.pendingJokerIndex = index;
+            openJokerModal();
+            return;
+        }
+        
+        this.selectedTile = tile;
+        this.renderRack();
+    }
+
+    setJokerValue(value) {
+        if (this.pendingJokerIndex !== undefined) {
+            const player = this.players[this.currentPlayerIndex];
+            player.rack[this.pendingJokerIndex].jokerValue = value;
+            this.selectedTile = player.rack[this.pendingJokerIndex];
+            this.pendingJokerIndex = undefined;
+            this.renderRack();
+        }
+    }
+
+    cancelMove() {
+        this.tempPlacements = [];
+        this.selectedTile = null;
+        this.render();
+        showNotification('Coup annulé');
+    }
+
+    validateMove() {
+        if (this.tempPlacements.length === 0) {
+            showNotification('Aucun jeton posé', 'error');
+            return;
+        }
+
+        const player = this.players[this.currentPlayerIndex];
+        
+        // Vérifier alignement
+        const sameX = this.tempPlacements.every(p => p.x === this.tempPlacements[0].x);
+        const sameY = this.tempPlacements.every(p => p.y === this.tempPlacements[0].y);
+        
+        if (!sameX && !sameY) {
+            showNotification('Les jetons doivent être alignés', 'error');
+            return;
+        }
+
+        // Vérifier contiguïté entre eux
+        if (this.tempPlacements.length > 1) {
+            const sorted = [...this.tempPlacements].sort((a, b) => sameX ? a.y - b.y : a.x - b.x);
+            for (let i = 1; i < sorted.length; i++) {
+                const prev = sameX ? sorted[i-1].y : sorted[i-1].x;
+                const curr = sameX ? sorted[i].y : sorted[i].x;
+                if (curr - prev !== 1) {
+                    showNotification('Les jetons doivent être accolés', 'error');
+                    return;
+                }
+            }
+        }
+
+        // Vérifier connexion au plateau
+        if (!this.firstMovePlayed) {
+            const onCenter = this.tempPlacements.some(p => p.x === CENTER.x && p.y === CENTER.y);
+            if (!onCenter) {
+                showNotification('Le premier coup doit être sur la case centrale', 'error');
+                return;
+            }
+        } else {
+            const touches = this.tempPlacements.some(p => this.hasAdjacentTile(p.x, p.y));
+            if (!touches) {
+                showNotification('Doit toucher un jeton existant', 'error');
+                return;
+            }
+        }
+
+        // Vérifier règles de somme
+        const lines = this.getAffectedLines();
+        for (const line of lines) {
+            const fullLine = this.getFullLine(line.x, line.y, line.dx, line.dy);
+            const sum = fullLine.reduce((s, t) => s + t.getEffectiveValue(), 0);
+            
+            if (fullLine.length === 2 && sum > 15) {
+                showNotification(`Somme ${sum} > 15 interdite pour 2 jetons`, 'error');
+                return;
+            }
+            if (fullLine.length === 3 && sum !== 15) {
+                showNotification(`Trio doit faire exactement 15 (actuel: ${sum})`, 'error');
+                return;
+            }
+            if (fullLine.length > 3) {
+                showNotification('Pas plus de 3 jetons côte à côte', 'error');
+                return;
+            }
+        }
+
+        // Vérifier jokers (max 1)
+        const jokers = this.tempPlacements.filter(p => p.tile.isJoker).length;
+        if (jokers > 1) {
+            showNotification('Maximum 1 joker par tour', 'error');
+            return;
+        }
+
+        // Tout est valide, on joue !
+        this.executeMove();
+    }
+
+    hasAdjacentTile(x, y) {
+        const dirs = [[0,1], [0,-1], [1,0], [-1,0]];
+        for (const [dx, dy] of dirs) {
+            const nx = x + dx, ny = y + dy;
+            if (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE) {
+                if (this.board[ny][nx] !== null) return true;
+            }
+        }
+        return false;
+    }
+
+    getAffectedLines() {
+        const lines = [];
+        const sameX = this.tempPlacements.every(p => p.x === this.tempPlacements[0].x);
+        
+        for (const p of this.tempPlacements) {
+            // Horizontal si même Y
+            if (!sameX || this.tempPlacements.length === 1) {
+                lines.push({ x: p.x, y: p.y, dx: 1, dy: 0 });
+            }
+            // Vertical si même X
+            if (sameX || this.tempPlacements.length === 1) {
+                lines.push({ x: p.x, y: p.y, dx: 0, dy: 1 });
+            }
+        }
+        return lines;
+    }
+
+    getFullLine(x, y, dx, dy) {
+        const tiles = [];
+        let cx = x, cy = y;
+        
+        // Reculer au début
+        while (true) {
+            const nx = cx - dx, ny = cy - dy;
+            if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE) break;
+            if (this.board[ny][nx] === null) break;
+            cx = nx; cy = ny;
+        }
+        
+        // Avancer
+        while (true) {
+            const tempTile = this.tempPlacements.find(p => p.x === cx && p.y === cy);
+            if (tempTile) {
+                tiles.push(tempTile.tile);
+            } else if (this.board[cy][cx] !== null) {
+                tiles.push(this.board[cy][cx]);
+            } else {
+                break;
+            }
+            cx += dx; cy += dy;
+            if (cx < 0 || cx >= BOARD_SIZE || cy < 0 || cy >= BOARD_SIZE) break;
+        }
+        
+        return tiles;
+    }
+
+    executeMove() {
+        const player = this.players[this.currentPlayerIndex];
+        const isTriolet = this.tempPlacements.length === 3 && player.rack.length === 3;
+        
+        // Calculer score
+        let score = 0;
+        let hasReplay = false;
+        const processed = new Set();
+        const lines = this.getAffectedLines();
+        
+        for (const line of lines) {
+            const key = `${line.x},${line.y},${line.dx},${line.dy}`;
+            if (processed.has(key)) continue;
+            
+            const fullLine = this.getFullLine(line.x, line.y, line.dx, line.dy);
+            if (fullLine.length < 2) continue;
+            
+            processed.add(key);
+            
+            let lineScore = 0;
+            const isTrio = fullLine.length === 3;
+            
+            if (isTrio) {
+                lineScore = 30;
+            } else {
+                lineScore = fullLine.reduce((s, t) => s + t.getScoreValue(), 0);
+            }
+            
+            // Cases spéciales
+            for (const p of this.tempPlacements) {
+                const cellType = this.getCellType(p.x, p.y);
+                if (cellType === 'replay') hasReplay = true;
+                
+                if ((cellType === 'double' || cellType === 'triple') && this.isInLine(p, line)) {
+                    const mult = cellType === 'double' ? 2 : 3;
+                    lineScore *= mult;
+                }
+            }
+            
+            score += lineScore;
+        }
+        
+        if (isTriolet && !this.tempPlacements.some(p => p.tile.isJoker)) {
+            score += 50;
+        }
+        
+        // Appliquer
+        player.score += score;
+        for (const p of this.tempPlacements) {
+            this.board[p.y][p.x] = p.tile;
+            const idx = player.rack.indexOf(p.tile);
+            if (idx > -1) player.rack.splice(idx, 1);
+            
+            // Marquer case spéciale utilisée
+            const key = `${p.x},${p.y}`;
+            if (this.getCellType(p.x, p.y) !== 'normal') {
+                this.usedSpecialCells.add(key);
+            }
+        }
+        
+        // Piocher
+        while (player.rack.length < 3 && this.bag.length > 0) {
+            const t = this.drawTile();
+            if (t) player.rack.push(t);
+        }
+        
+        this.firstMovePlayed = true;
+        this.tempPlacements = [];
+        this.selectedTile = null;
+        
+        // Historique
+        this.addHistory(player.name, score, isTriolet);
+        
+        // Fin de partie ?
+        if (this.bag.length === 0 && player.rack.length === 0) {
+            this.endGame(player);
+            return;
+        }
+        
+        // Passer tour ou rejouer
+        if (!hasReplay) {
+            this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
+        } else {
+            showNotification('Case Rejouer ! Vous rejouez.', 'warning');
+        }
+        
+        this.render();
+        showNotification(`+${score} points !`, 'success');
+    }
+
+    getCellType(x, y) {
+        if (this.usedSpecialCells.has(`${x},${y}`)) return 'normal';
+        if (x === CENTER.x && y === CENTER.y) return 'double';
+        if (SPECIAL_CELLS.double.some(c => c.x === x && c.y === y)) return 'double';
+        if (SPECIAL_CELLS.triple.some(c => c.x === x && c.y === y)) return 'triple';
+        if (SPECIAL_CELLS.replay.some(c => c.x === x && c.y === y)) return 'replay';
+        return 'normal';
+    }
+
+    isInLine(p, line) {
+        if (line.dx === 1) return p.y === line.y;
+        return p.x === line.x;
+    }
+
+    exchangeTiles() {
+        if (this.bag.length < 5) {
+            showNotification('Pas assez de jetons dans le sac (minimum 5)', 'error');
+            return;
+        }
+        
+        const player = this.players[this.currentPlayerIndex];
+        if (player.rack.length === 0) {
+            showNotification('Vous n\'avez pas de jetons à échanger', 'error');
+            return;
+        }
+        
+        // Remettre en sac
+        player.rack.forEach(t => this.bag.push(t));
+        player.rack = [];
+        this.shuffleBag();
+        
+        // Piocher 3 nouveaux
+        for (let i = 0; i < 3; i++) {
+            const t = this.drawTile();
+            if (t) player.rack.push(t);
+        }
+        
+        this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
+        this.render();
+        showNotification('Échange effectué - Tour passé');
+    }
+
+    addHistory(playerName, score, isTriolet) {
+        const history = document.getElementById('history');
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        let text = `${playerName}: +${score} pts`;
+        if (isTriolet) text += ' (TRIOLET!)';
+        item.textContent = text;
+        history.insertBefore(item, history.firstChild);
+    }
+
+    endGame(winner) {
+        // Bonus de fin
+        let bonus = 0;
+        this.players.forEach(p => {
+            if (p !== winner) {
+                const val = p.rack.reduce((s, t) => s + t.getScoreValue(), 0);
+                bonus += val;
+            }
+        });
+        winner.score += bonus;
+        
+        this.gameEnded = true;
+        this.render();
+        
+        setTimeout(() => {
+            alert(`Fin de partie !\nGagnant: ${winner.name} avec ${winner.score} points`);
+        }, 500);
+    }
+
+    render() {
+        this.renderBoard();
+        this.renderRack();
+        this.renderInfo();
+    }
+
+    renderBoard() {
+        for (let y = 0; y < BOARD_SIZE; y++) {
+            for (let x = 0; x < BOARD_SIZE; x++) {
+                const cell = document.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`);
+                const temp = this.tempPlacements.find(p => p.x === x && p.y === y);
+                
+                // Reset classes
+                cell.className = 'cell';
+                if (x === CENTER.x && y === CENTER.y) cell.classList.add('special-center');
+                else if (SPECIAL_CELLS.double.some(c => c.x === x && c.y === y)) cell.classList.add('special-x2');
+                else if (SPECIAL_CELLS.triple.some(c => c.x === x && c.y === y)) cell.classList.add('special-x3');
+                else if (SPECIAL_CELLS.replay.some(c => c.x === x && c.y === y)) cell.classList.add('special-replay');
+                
+                if (this.usedSpecialCells.has(`${x},${y}`)) {
+                    cell.classList.add('special-used');
+                }
+                
+                if (temp) {
+                    cell.classList.add('temp');
+                    cell.innerHTML = `<div style="font-size:18px;font-weight:bold">${temp.tile.getDisplayValue()}</div>`;
+                } else if (this.board[y][x]) {
+                    cell.classList.add('occupied');
+                    const tile = this.board[y][x];
+                    cell.innerHTML = `<div style="font-size:18px;font-weight:bold">${tile.getDisplayValue()}</div>`;
+                } else {
+                    // Restore original content
+                    if (x === CENTER.x && y === CENTER.y) cell.innerHTML = '★<span class="multiplier">x2</span>';
+                    else if (SPECIAL_CELLS.double.some(c => c.x === x && c.y === y)) cell.innerHTML = '<span class="multiplier">x2</span>';
+                    else if (SPECIAL_CELLS.triple.some(c => c.x === x && c.y === y)) cell.innerHTML = '<span class="multiplier">x3</span>';
+                    else if (SPECIAL_CELLS.replay.some(c => c.x === x && c.y === y)) cell.innerHTML = '↻';
+                    else cell.innerHTML = '';
+                }
+            }
+        }
+    }
+
+    renderRack() {
+        const rack = document.getElementById('rack');
+        rack.innerHTML = '';
+        const player = this.players[this.currentPlayerIndex];
+        
+        player.rack.forEach((tile, index) => {
+            const slot = document.createElement('div');
+            slot.className = 'rack-slot';
+            
+            const tileEl = document.createElement('div');
+            tileEl.className = 'tile' + (tile.isJoker ? ' joker' : '');
+            if (this.selectedTile === tile) tileEl.classList.add('selected');
+            
+            let display = tile.getDisplayValue();
+            let subtext = '';
+            
+            if (tile.isJoker && tile.jokerValue !== null) {
+                subtext = `(${tile.jokerValue})`;
+            }
+            
+            tileEl.innerHTML = `
+                <div class="tile-value">${display}</div>
+                ${subtext ? `<div style="font-size:10px">val:${subtext}</div>` : ''}
+                ${!tile.isJoker ? `<div class="tile-count">${this.getTileCount(tile.value)}</div>` : ''}
+            `;
+            
+            tileEl.onclick = () => this.selectTile(index);
+            slot.appendChild(tileEl);
+            rack.appendChild(slot);
+        });
+    }
+
+    getTileCount(value) {
+        // Compte approximatif pour info (peut ne pas être exact après échanges)
+        return TILE_DISTRIBUTION[value] || 0;
+    }
+
+    renderInfo() {
+        const player = this.players[this.currentPlayerIndex];
+        document.getElementById('currentPlayer').textContent = player ? player.name : '-';
+        document.getElementById('currentScore').textContent = player ? player.score + ' pts' : '0 pts';
+        document.getElementById('bagCount').textContent = this.bag.length;
+        
+        const scoresList = document.getElementById('scoresList');
+        scoresList.innerHTML = this.players.map(p => 
+            `<div style="display:flex;justify-content:space-between;margin:5px 0;padding:5px;background:rgba(255,255,255,0.1);border-radius:4px;">
+                <span>${p.name} ${p === player ? '▶' : ''}</span>
+                <strong>${p.score}</strong>
+            </div>`
+        ).join('');
+    }
+}
+
+// UI Functions
+function showNotification(msg, type = 'success') {
+    const notif = document.getElementById('notification');
+    notif.textContent = msg;
+    notif.className = 'notification ' + (type !== 'success' ? type : '');
+    notif.style.display = 'block';
+    setTimeout(() => notif.style.display = 'none', 3000);
+}
+
+function openJokerModal() {
+    document.getElementById('jokerModal').style.display = 'flex';
+    document.getElementById('jokerValue').focus();
+}
+
+function closeJokerModal() {
+    document.getElementById('jokerModal').style.display = 'none';
+    game.pendingJokerIndex = undefined;
+}
+
+function confirmJoker() {
+    const val = parseInt(document.getElementById('jokerValue').value);
+    if (val >= 0 && val <= 15) {
+        game.setJokerValue(val);
+        closeJokerModal();
+    } else {
+        alert('Valeur entre 0 et 15');
+    }
+}
+
+function showRules() {
+    document.getElementById('rulesModal').style.display = 'flex';
+}
+
+function closeRules() {
+    document.getElementById('rulesModal').style.display = 'none';
+}
+
+// Initialisation
+const game = new TrioletGame();
+
+// Ajouter des joueurs (pour l'instant 1 joueur vs IA ou local)
+game.addPlayer("Joueur 1");
+game.addPlayer("Joueur 2");
+
+game.render();
+
+// Fermer modals si clic extérieur
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+    }
+}
+</script>
+
 </body>
 </html>
