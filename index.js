@@ -880,11 +880,15 @@ function renderDrawScreen(){
 
 function runStartDraw(){
   if(!drawState)return;
-  const pool=drawState.pool;
-  const active=drawState.entries.filter(e=>drawState.active.has(e.idx));
-  active.forEach(e=>{ e.drawn = pool.splice(-1,1)[0]; });
 
-  const numeric = active.map(e=>({idx:e.idx,val:e.drawn.isJoker?-1:e.drawn.val}));
+  const active=drawState.entries.filter(e=>drawState.active.has(e.idx));
+  const pool=drawState.pool;
+
+  active.forEach(e=>{
+    e.drawn=pool.splice(-1,1)[0];
+  });
+
+  const numeric=active.map(e=>({idx:e.idx,val:e.drawn.isJoker?-1:e.drawn.val}));
   const best=Math.max(...numeric.map(x=>x.val));
   const winners=numeric.filter(x=>x.val===best).map(x=>x.idx);
 
@@ -892,11 +896,12 @@ function runStartDraw(){
     startPlayerIndex=winners[0];
     drawState.ready=true;
     drawState.message=`${drawState.entries[startPlayerIndex].cfg.name} commence avec ${best}.`;
+    renderDrawScreen();
   }else{
     drawState.message=`Égalité à ${best}. Nouveau tirage entre ${winners.map(i=>drawState.entries[i].cfg.name).join(', ')}.`;
     drawState.active=new Set(winners);
+    renderDrawScreen();
   }
-  renderDrawScreen();
 }
 
 function beginStartDraw(configs){
@@ -918,7 +923,6 @@ function startGameAfterDraw(){
   if(!drawState||!drawState.ready||!pendingStartConfigs)return;
 
   G=newGame(pendingStartConfigs.slice(0,nbPlayers));
-  const starter=drawState.entries[startPlayerIndex];
   G.cur=startPlayerIndex;
 
   G.joueurs.forEach((j,i)=>{
@@ -932,7 +936,7 @@ function startGameAfterDraw(){
   render();
 
   addLog('🎮 '+G.joueurs.map(j=>j.name).join(' vs ')+' — Bonne partie !','g');
-  addLog(`🎲 ${starter.cfg.name} commence après le tirage au sort`,'i');
+  addLog(`🎲 ${drawState.entries[startPlayerIndex].cfg.name} commence après le tirage au sort`,'i');
   addLog('📦 '+G.sac.length+' jetons dans le sac','i');
 
   if(G.joueurs[G.cur].isAI)setTimeout(aiTurn,800);
