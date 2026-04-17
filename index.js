@@ -845,7 +845,7 @@ function renderDrawScreen(){
   if(!list||!drawState)return;
 
   list.innerHTML='';
-  drawState.entries.forEach((e)=>{
+  drawState.entries.forEach((e,idx)=>{
     const row=document.createElement('div');
     row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid #334155;border-radius:10px;background:#0f172a;';
     const name=document.createElement('div');
@@ -853,7 +853,7 @@ function renderDrawScreen(){
     name.textContent=(e.cfg.isAI?'🤖 ':'👤 ')+e.cfg.name;
     const tok=document.createElement('div');
     tok.className='htok'+(e.drawn&&e.drawn.isJoker?' joker':'');
-    tok.textContent=e.drawn?tokLabel(e.drawn):'…';
+    tok.textContent=e.drawn?tokLabel(e.drawn):'—';
     row.appendChild(name); row.appendChild(tok); list.appendChild(row);
   });
 
@@ -874,7 +874,7 @@ function beginStartDraw(configs){
   document.getElementById('screen-draw').style.display='block';
   document.getElementById('screen-game').style.display='none';
   renderDrawScreen();
-  setTimeout(runStartDraw, 50);
+  setTimeout(()=>{ if(!drawState.ready) runStartDraw(); }, 50);
 }
 
 function startGameAfterDraw(){
@@ -1033,7 +1033,14 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
 
   // TIRAGE AU SORT
-  document.getElementById('btn-draw-start').addEventListener('click',startGameAfterDraw);
+  document.getElementById('btn-draw-start').addEventListener('click',()=>{
+    if(drawState && !drawState.ready){
+      runStartDraw();
+      setTimeout(()=>{ if(drawState&&drawState.ready) startGameAfterDraw(); }, 60);
+      return;
+    }
+    startGameAfterDraw();
+  });
 
   // ÉCHANGER
   document.getElementById('btn-echanger').addEventListener('click',()=>{
