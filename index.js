@@ -573,36 +573,7 @@ function aiTurn(){
     finishTurn();
   }
 }
-  if(best){
-    G.pend=[{...best}];
-    const pts=calcPoints();
-    pl.score+=pts;
-    addLog(`🤖 ${pl.name} → ${String.fromCharCode(65+best.r)}${best.c+1} +${pts} pts → Total ${pl.score}`,'score');
-
-    G.board[best.r][best.c]={val:best.val,isJoker:best.isJoker,jokerVal:best.jokerVal};
-    pl.hand.splice(best.hi,1);
-    pl.hand.push(...drawN(G.sac,1));
-
-    const rejouer=G.rejouer;
-    G.pend=[];G.first=false;G.rejouer=false;
-
-    if(checkEnd())return;
-    if(rejouer){finishTurn({samePlayer:true});}
-    else finishTurn();
-
-  }else{
-    if(G.sac.length>=5&&pl.hand.length>0){
-      const idx=Math.floor(Math.random()*pl.hand.length);
-      const t=pl.hand.splice(idx,1);
-      G.sac.push(...t);shuffle(G.sac);
-      pl.hand.push(...drawN(G.sac,1));
-      addLog(`🤖 ${pl.name} échange`,'i');
-    }else{
-      addLog(`🤖 ${pl.name} passe`,'i');
-    }
-    finishTurn();
-  }
-}
+ 
 
 // =====================================================
 //  RENDU
