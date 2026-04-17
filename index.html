@@ -1,185 +1,678 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Triolet</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>Triolet Online</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+
+body{
+  background:#0f172a;
+  color:#e2e8f0;
+  font-family:'Segoe UI',system-ui,sans-serif;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* ===== HEADER ===== */
+header{
+  background:#1e293b;
+  padding:10px 20px;
+  border-bottom:3px solid #f59e0b;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  position:sticky;
+  top:0;
+  z-index:50;
+}
+.logo{
+  width:30px;height:30px;
+  background:linear-gradient(135deg,#f59e0b,#d97706);
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  flex-shrink:0;
+}
+header h1{
+  font-size:clamp(1.1rem,3vw,1.6rem);
+  font-weight:800;
+  color:#f59e0b;
+}
+
+/* ===== LOBBY ===== */
+#screen-lobby{
+  max-width:420px;
+  margin:30px auto;
+  padding:0 16px;
+}
+.card{
+  background:#1e293b;
+  border-radius:12px;
+  padding:20px;
+  margin-bottom:16px;
+  border:1px solid #334155;
+}
+.card-title{
+  color:#fbbf24;
+  font-weight:700;
+  margin-bottom:14px;
+  font-size:1rem;
+}
+.field{
+  width:100%;
+  padding:11px 14px;
+  border-radius:8px;
+  border:1px solid #334155;
+  background:#0f172a;
+  color:#e2e8f0;
+  font-size:1rem;
+  margin-bottom:10px;
+  -webkit-appearance:none;
+}
+.field:focus{outline:none;border-color:#f59e0b;}
+
+/* Boutons nombre de joueurs */
+.nb-btn{
+  flex:1;
+  padding:10px;
+  border:2px solid #334155;
+  border-radius:8px;
+  background:#0f172a;
+  color:#94a3b8;
+  font-size:1.1rem;
+  font-weight:700;
+  cursor:pointer;
+  transition:all .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.nb-btn.on{
+  background:#f59e0b;
+  color:#1a1a1a;
+  border-color:#f59e0b;
+}
+
+/* Config joueurs */
+.player-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:10px;
+}
+.player-num{
+  width:28px;height:28px;
+  border-radius:50%;
+  background:#334155;
+  color:#fbbf24;
+  font-weight:700;
+  font-size:.85rem;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.player-name-inp{
+  flex:1;
+  padding:8px 12px;
+  border-radius:8px;
+  border:1px solid #334155;
+  background:#0f172a;
+  color:#e2e8f0;
+  font-size:.9rem;
+}
+.player-name-inp:focus{outline:none;border-color:#f59e0b;}
+.type-toggle{
+  display:flex;
+  border-radius:8px;
+  overflow:hidden;
+  border:1px solid #334155;
+  flex-shrink:0;
+}
+.type-btn{
+  padding:7px 10px;
+  border:none;
+  background:#0f172a;
+  color:#94a3b8;
+  font-size:.75rem;
+  font-weight:700;
+  cursor:pointer;
+  transition:all .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.type-btn.on{
+  background:#3b82f6;
+  color:#fff;
+}
+
+/* ===== BOUTONS GÉNÉRAUX ===== */
+.btn{
+  border:none;
+  border-radius:8px;
+  font-weight:700;
+  cursor:pointer;
+  transition:opacity .15s,transform .15s;
+  text-transform:uppercase;
+  letter-spacing:.4px;
+  -webkit-tap-highlight-color:transparent;
+  white-space:nowrap;
+}
+.btn:active{opacity:.8;transform:scale(.97);}
+.btn-green{background:#22c55e;color:#fff;}
+.btn-gray {background:#475569;color:#fff;}
+.btn-blue {background:#3b82f6;color:#fff;}
+.btn-red  {background:#ef4444;color:#fff;}
+
+/* ===== ÉCRAN JEU ===== */
+#screen-game{
+  display:none;
+  padding:8px;
+}
+.game-wrap{
+  display:flex;
+  gap:10px;
+  align-items:flex-start;
+  justify-content:center;
+  flex-wrap:wrap;
+}
+
+/* ===== ZONE PLATEAU ===== */
+.board-zone{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:8px;
+  flex-shrink:0;
+}
+.board-shell{
+  background:#0f2a5e;
+  border-radius:4px;
+  padding:3px;
+  box-shadow:0 8px 32px rgba(0,0,0,.6);
+  display:inline-block;
+}
+.board-grid-wrap{
+  display:grid;
+  grid-template-columns:var(--lbl) auto;
+  grid-template-rows:var(--lbl) auto;
+}
+.coord-corner{
+  width:var(--lbl);height:var(--lbl);
+  background:#0f2a5e;
+}
+.coord-cols{
+  display:flex;
+  background:#0f2a5e;
+}
+.coord-cols span{
+  width:var(--cs);
+  text-align:center;
+  font-size:var(--csf);
+  color:#7dd3fc;
+  font-weight:600;
+  line-height:var(--lbl);
+}
+.coord-rows{
+  display:flex;
+  flex-direction:column;
+  background:#0f2a5e;
+}
+.coord-rows span{
+  height:var(--cs);
+  width:var(--lbl);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:var(--csf);
+  color:#7dd3fc;
+  font-weight:600;
+}
+#board{
+  display:grid;
+  grid-template-columns:repeat(15,var(--cs));
+  grid-template-rows:repeat(15,var(--cs));
+  gap:1px;
+  background:#0a1f4a;
+}
+.cell{
+  width:var(--cs);height:var(--cs);
+  background:#1e4080;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  position:relative;
+  transition:background .1s;
+  border-radius:1px;
+  -webkit-tap-highlight-color:transparent;
+  overflow:hidden;
+}
+.cell:hover{background:#28509a;}
+.cell.sp-R{background:#6d28d9;}
+.cell.sp-D{background:#2563eb;}
+.cell.sp-T{background:#16a34a;}
+.cell.sp-C{background:#d97706;}
+.cell.placeable{
+  background:#14532d !important;
+  box-shadow:inset 0 0 0 2px #4ade80;
+}
+.cell.placeable:hover{background:#166534 !important;}
+
+/* Labels cases spéciales */
+.cell-lbl{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  width:100%;height:100%;
+  pointer-events:none;
+  user-select:none;
+}
+.cell-lbl-text{
+  font-size:calc(var(--cs) * .36);
+  font-weight:900;
+  color:rgba(255,255,255,.97);
+  text-shadow:0 1px 3px rgba(0,0,0,.7);
+  line-height:1;
+  letter-spacing:-.5px;
+}
+.cell-lbl svg{
+  width:calc(var(--cs) * .58);
+  height:calc(var(--cs) * .58);
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));
+}
+
+/* ===== JETONS PLATEAU ===== */
+.tok{
+  width:calc(var(--cs) - 4px);
+  height:calc(var(--cs) - 4px);
+  background:linear-gradient(145deg,#fef9e7,#f5d76e);
+  border-radius:3px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#1a1a1a;
+  font-weight:900;
+  font-size:calc(var(--cs) * .4);
+  border:1.5px solid #c9a227;
+  box-shadow:0 2px 4px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.5);
+  position:relative;
+  user-select:none;
+  line-height:1;
+}
+.tok.joker{
+  background:linear-gradient(145deg,#fff3e0,#ffcc80);
+  color:#dc2626;
+  font-weight:900;
+}
+.tok.pending{
+  border:2px solid #22c55e;
+  box-shadow:0 0 6px rgba(34,197,94,.5),inset 0 1px 0 rgba(255,255,255,.5);
+  cursor:pointer;
+}
+/* Valeur joker dans l'angle — plus grande */
+.tok .jcorner{
+  position:absolute;
+  bottom:1px;right:2px;
+  font-size:calc(var(--cs) * .30);
+  font-weight:900;
+  color:#1a1a1a;
+  font-style:normal;
+  line-height:1;
+  background:rgba(255,255,255,.9);
+  border-radius:2px;
+  padding:0 2px;
+  min-width:calc(var(--cs) * .28);
+  text-align:center;
+}
+
+/* ===== BLOC CHEVALET + BOUTONS ===== */
+.hand-block{
+  background:#1e293b;
+  border:1px solid #334155;
+  border-radius:12px;
+  padding:12px;
+  width:100%;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.hand-info{
+  font-size:.78rem;
+  color:#94a3b8;
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  align-items:center;
+  justify-content:space-between;
+}
+.hand-info strong{color:#fbbf24;}
+.hand-tokens{
+  display:flex;
+  gap:8px;
+  justify-content:center;
+  flex-wrap:wrap;
+  min-height:54px;
+  align-items:center;
+}
+.hand-sep{
+  height:1px;
+  background:#334155;
+  margin:0 -12px;
+}
+/* 4 boutons en ligne */
+.action-row{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:6px;
+}
+.action-row .btn{
+  padding:10px 4px;
+  font-size:clamp(.6rem,.8vw,.78rem);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+}
+
+/* Jetons chevalet */
+.htok{
+  width:52px;height:52px;
+  background:linear-gradient(145deg,#fef9e7,#f5d76e);
+  border-radius:7px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#1a1a1a;
+  font-weight:900;
+  font-size:1.25rem;
+  border:2px solid transparent;
+  cursor:pointer;
+  box-shadow:0 3px 6px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.5);
+  transition:transform .15s,box-shadow .15s,border-color .15s;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+}
+.htok:hover{
+  transform:translateY(-4px);
+  box-shadow:0 6px 12px rgba(0,0,0,.3);
+}
+.htok.sel{
+  border-color:#22c55e;
+  transform:translateY(-7px);
+  box-shadow:0 0 0 3px rgba(34,197,94,.35),0 8px 14px rgba(0,0,0,.3);
+}
+.htok.joker{
+  background:linear-gradient(145deg,#fff3e0,#ffcc80);
+  color:#dc2626;
+  font-weight:900;
+}
+.htok.ghost{
+  background:#0f172a;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.4);
+  cursor:default;
+  border-color:#334155;
+}
+.htok.ghost:hover{transform:none;box-shadow:inset 0 2px 4px rgba(0,0,0,.4);}
+
+/* ===== PANEL DROIT ===== */
+.side-panel{
+  width:250px;
+  flex-shrink:0;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.pcard{
+  background:#1e293b;
+  border-radius:10px;
+  padding:14px;
+  border:1px solid #334155;
+}
+.ptitle{
+  font-size:.78rem;
+  font-weight:700;
+  color:#fbbf24;
+  text-transform:uppercase;
+  letter-spacing:.6px;
+  margin-bottom:10px;
+}
+.srow{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:7px 0;
+  border-bottom:1px solid #334155;
+  font-size:.9rem;
+}
+.srow:last-child{border-bottom:none;}
+.srow .pts{font-size:1.15rem;font-weight:800;color:#fbbf24;}
+.srow .cur{color:#22c55e;font-weight:700;}
+
+/* Journal */
+.log-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:8px;
+}
+.log-toggle{display:flex;gap:5px;}
+.ltbtn{
+  padding:3px 10px;
+  border:none;border-radius:12px;
+  font-size:.7rem;cursor:pointer;
+  background:#334155;color:#94a3b8;font-weight:600;
+  transition:background .15s;
+}
+.ltbtn.on{background:#22c55e;color:#fff;}
+#logbox{
+  background:#0f172a;
+  border-radius:6px;
+  padding:8px;
+  max-height:200px;
+  overflow-y:auto;
+  font-size:.78rem;
+  border:1px solid #334155;
+}
+#logbox p{margin-bottom:4px;line-height:1.4;}
+.lg{color:#4ade80;}
+.lb{color:#f87171;}
+.li{color:#93c5fd;}
+.lp{color:#fbbf24;font-weight:700;}
+
+/* ===== MODALS ===== */
+.overlay{
+  display:none;
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.78);
+  backdrop-filter:blur(3px);
+  z-index:200;
+  align-items:center;
+  justify-content:center;
+  padding:16px;
+}
+.overlay.on{display:flex;}
+.modal{
+  background:#1e293b;
+  border-radius:14px;
+  padding:22px;
+  width:100%;max-width:340px;
+  border:1px solid #475569;
+  box-shadow:0 25px 50px rgba(0,0,0,.6);
+}
+.modal h2{color:#fbbf24;text-align:center;margin-bottom:10px;font-size:1.15rem;}
+.modal .sub{color:#94a3b8;text-align:center;font-size:.88rem;margin-bottom:14px;}
+.jgrid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:7px;margin-bottom:14px;
+}
+.jval{
+  padding:11px 4px;
+  background:#334155;border-radius:7px;
+  text-align:center;cursor:pointer;
+  font-weight:700;font-size:.95rem;
+  transition:background .15s,transform .1s;
+  -webkit-tap-highlight-color:transparent;
+}
+.jval:hover,.jval:active{background:#f59e0b;color:#1a1a1a;transform:scale(1.08);}
+.finrow{
+  display:flex;justify-content:space-between;
+  padding:8px 0;border-bottom:1px solid #334155;font-size:.95rem;
+}
+.finrow:last-child{border-bottom:none;}
+.finpts{font-weight:800;color:#fbbf24;}
+
+/* ===== RESPONSIVE ===== */
+:root{
+  --cs:38px;
+  --lbl:22px;
+  --csf:.68rem;
+}
+@media(max-width:1100px){
+  :root{--cs:34px;--lbl:20px;--csf:.62rem;}
+}
+@media(max-width:900px){
+  :root{--cs:30px;--lbl:18px;--csf:.58rem;}
+  .side-panel{width:100%;max-width:620px;}
+  .game-wrap{flex-direction:column;align-items:center;}
+}
+@media(max-width:680px){
+  :root{--cs:26px;--lbl:16px;--csf:.52rem;}
+  .htok{width:46px;height:46px;font-size:1.05rem;}
+}
+@media(max-width:520px){
+  :root{--cs:22px;--lbl:14px;--csf:.46rem;}
+  .htok{width:42px;height:42px;font-size:.95rem;}
+  .action-row .btn{font-size:.6rem;padding:9px 2px;}
+}
+@media(max-width:420px){
+  :root{--cs:19px;--lbl:13px;--csf:.42rem;}
+  .htok{width:38px;height:38px;font-size:.88rem;}
+  .action-row .btn{font-size:.55rem;padding:8px 2px;}
+}
+</style>
 </head>
 <body>
 
-  <!-- ═══════════════════════════════════════════════════════
-       ÉCRAN DE CONFIGURATION
-  ══════════════════════════════════════════════════════════ -->
-  <div id="setup-screen" class="screen active">
-    <div class="setup-container">
-      <h1 class="game-title">🎲 Triolet</h1>
-      <p class="subtitle">Le grand classique des jeux de chiffres</p>
+<header>
+  <div class="logo"></div>
+  <h1>Triolet Online</h1>
+</header>
 
-      <div id="players-config">
-        <!-- Joueur 1 – toujours humain -->
-        <div class="player-config" data-index="0">
-          <div class="player-config-header">
-            <span class="player-number">Joueur 1</span>
-          </div>
-          <div class="player-config-body">
-            <input  class="player-name"  type="text"     value="Joueur 1" maxlength="16">
-            <label  class="ai-label">
-              <input class="player-ai" type="checkbox"> IA
-            </label>
-            <select class="player-difficulty" disabled>
-              <option value="easy">Facile</option>
-              <option value="medium" selected>Moyen</option>
-              <option value="hard">Difficile</option>
-            </select>
+<!-- ========== LOBBY ========== -->
+<div id="screen-lobby">
+
+  <div class="card">
+    <div class="card-title">🎮 Configuration des joueurs</div>
+
+    <label style="color:#94a3b8;font-size:.85rem;display:block;margin-bottom:6px;">
+      Nombre de joueurs (2 à 4)
+    </label>
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <button class="nb-btn on" data-nb="2">2</button>
+      <button class="nb-btn"    data-nb="3">3</button>
+      <button class="nb-btn"    data-nb="4">4</button>
+    </div>
+
+    <div id="players-config"></div>
+
+    <button id="btn-jouer" class="btn btn-green"
+            style="width:100%;padding:13px;font-size:.95rem;margin-top:8px;">
+      ▶ &nbsp;JOUER
+    </button>
+  </div>
+</div>
+
+<!-- ========== JEU ========== -->
+<div id="screen-game">
+  <div class="game-wrap">
+
+    <!-- Plateau + chevalet -->
+    <div class="board-zone">
+
+      <div class="board-shell">
+        <div class="board-grid-wrap">
+          <div class="coord-corner"></div>
+          <div class="coord-cols" id="cc"></div>
+          <div class="coord-rows" id="cr"></div>
+          <div id="board"></div>
+        </div>
+      </div>
+
+      <!-- Bloc chevalet + boutons -->
+      <div class="hand-block">
+        <div class="hand-info">
+          <span>🎴 <strong id="turn-name">-</strong></span>
+          <span>🎒 Sac : <strong id="sac-ct">80</strong></span>
+        </div>
+        <div id="hand-tokens" class="hand-tokens"></div>
+        <div class="hand-sep"></div>
+        <div class="action-row">
+          <button id="btn-valider"  class="btn btn-green">✅ Valider</button>
+          <button id="btn-annuler"  class="btn btn-gray" >↩ Annuler</button>
+          <button id="btn-echanger" class="btn btn-blue" >🔄 Échange</button>
+          <button id="btn-quitter"  class="btn btn-red"  >🚪 Quitter</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Panel droit -->
+    <div class="side-panel">
+
+      <div class="pcard">
+        <div class="ptitle">🏆 Scores</div>
+        <div id="scores-list"></div>
+      </div>
+
+      <div class="pcard">
+        <div class="log-head">
+          <div class="ptitle" style="margin:0;">📋 Journal</div>
+          <div class="log-toggle">
+            <button class="ltbtn on" id="btn-ld">Détaillé</button>
+            <button class="ltbtn"    id="btn-lm">Minimum</button>
           </div>
         </div>
-
-        <!-- Joueur 2 -->
-        <div class="player-config" data-index="1">
-          <div class="player-config-header">
-            <span class="player-number">Joueur 2</span>
-          </div>
-          <div class="player-config-body">
-            <input  class="player-name"  type="text"     value="Joueur 2" maxlength="16">
-            <label  class="ai-label">
-              <input class="player-ai" type="checkbox"> IA
-            </label>
-            <select class="player-difficulty" disabled>
-              <option value="easy">Facile</option>
-              <option value="medium" selected>Moyen</option>
-              <option value="hard">Difficile</option>
-            </select>
-          </div>
-        </div>
+        <div id="logbox"></div>
       </div>
 
-      <div class="setup-actions">
-        <button id="add-player-btn" class="btn btn-secondary">+ Ajouter un joueur</button>
-        <button id="start-btn"      class="btn btn-primary">▶ Démarrer la partie</button>
-      </div>
     </div>
   </div>
+</div>
 
-  <!-- ═══════════════════════════════════════════════════════
-       ÉCRAN DE JEU
-  ══════════════════════════════════════════════════════════ -->
-  <div id="game-screen" class="screen">
-
-    <!-- Bandeau supérieur -->
-    <header class="game-header">
-      <h1 class="game-title-small">🎲 Triolet</h1>
-      <div id="message-bar" class="message-bar"></div>
-      <div class="header-right">
-        <span id="bag-count" class="bag-info">🎒 <span id="bag-number">80</span></span>
-        <button id="rules-btn" class="btn btn-small">📖 Règles</button>
-        <button id="restart-btn" class="btn btn-small btn-secondary">↺ Rejouer</button>
-      </div>
-    </header>
-
-    <!-- Zone principale -->
-    <div class="game-main">
-
-      <!-- Panneau gauche : scores + chevalets -->
-      <aside class="side-panel left-panel">
-        <div id="players-panel"></div>
-      </aside>
-
-      <!-- Plateau -->
-      <section class="board-section">
-        <div id="board" class="board"></div>
-      </section>
-
-      <!-- Panneau droit : contrôles -->
-      <aside class="side-panel right-panel">
-        <div class="controls-box">
-          <h3>Actions</h3>
-          <button id="confirm-btn" class="btn btn-primary"  disabled>✔ Valider</button>
-          <button id="cancel-btn"  class="btn btn-warning">✖ Annuler</button>
-          <button id="pass-btn"    class="btn btn-secondary">⏭ Passer / Échanger</button>
-        </div>
-
-        <div class="legend-box">
-          <h3>Légende</h3>
-          <div class="legend-item"><span class="legend-cell double"></span> Case ×2</div>
-          <div class="legend-item"><span class="legend-cell triple"></span> Case ×3</div>
-          <div class="legend-item"><span class="legend-cell replay"></span> Rejouer</div>
-          <div class="legend-item"><span class="legend-cell center-mark"></span> Centre</div>
-        </div>
-      </aside>
-    </div>
+<!-- MODAL JOKER -->
+<div class="overlay" id="modal-joker">
+  <div class="modal">
+    <h2>🃏 Valeur du Joker</h2>
+    <p class="sub">Quelle valeur (0-15) ce joker représente-t-il ?</p>
+    <div class="jgrid" id="jgrid"></div>
+    <button id="btn-joker-cancel" class="btn btn-gray"
+            style="width:100%;padding:11px;">Annuler</button>
   </div>
+</div>
 
-  <!-- ═══════════════════════════════════════════════════════
-       MODAL : ÉCHANGE DE JETONS
-  ══════════════════════════════════════════════════════════ -->
-  <div id="exchange-panel" class="modal-overlay">
-    <div class="modal-box">
-      <h3>Passer / Échanger</h3>
-      <p>Cliquez sur les jetons à échanger puis confirmez.<br>
-         Ou passez directement votre tour sans échanger.</p>
-      <div id="exchange-rack" class="exchange-rack"></div>
-      <p id="exchange-bag-info" class="exchange-bag-info"></p>
-      <div class="modal-actions">
-        <button id="exchange-confirm-btn" class="btn btn-primary"   disabled>⇄ Échanger la sélection</button>
-        <button id="pass-only-btn"        class="btn btn-warning">⏭ Passer sans échanger</button>
-        <button id="exchange-cancel-btn"  class="btn btn-secondary">✖ Annuler</button>
-      </div>
-    </div>
+<!-- MODAL ÉCHANGE -->
+<div class="overlay" id="modal-ech">
+  <div class="modal">
+    <h2>🔄 Échanger</h2>
+    <p class="sub">Sélectionnez 1 à 3 jetons à remettre dans le sac</p>
+    <div id="ech-toks"
+         style="display:flex;gap:8px;justify-content:center;
+                margin:12px 0;flex-wrap:wrap;min-height:56px;"></div>
+    <button id="btn-ech-ok" class="btn btn-green"
+            style="width:100%;padding:11px;margin-bottom:8px;">Confirmer</button>
+    <button id="btn-ech-no" class="btn btn-gray"
+            style="width:100%;padding:11px;">Annuler</button>
   </div>
+</div>
 
-  <!-- ═══════════════════════════════════════════════════════
-       MODAL : FIN DE PARTIE
-  ══════════════════════════════════════════════════════════ -->
-  <div id="end-screen" class="modal-overlay">
-    <div class="modal-box end-box">
-      <h2>🏆 Fin de partie !</h2>
-      <div id="end-scores"></div>
-      <button id="end-restart-btn" class="btn btn-primary">↺ Rejouer</button>
-    </div>
+<!-- MODAL FIN -->
+<div class="overlay" id="modal-fin">
+  <div class="modal">
+    <h2>🎉 Fin de partie !</h2>
+    <div id="fin-scores" style="margin:16px 0;"></div>
+    <button id="btn-rejouer" class="btn btn-green"
+            style="width:100%;padding:13px;">Nouvelle partie</button>
   </div>
+</div>
 
-  <!-- ═══════════════════════════════════════════════════════
-       MODAL : RÈGLES
-  ══════════════════════════════════════════════════════════ -->
-  <div id="rules-panel" class="modal-overlay">
-    <div class="modal-box rules-box">
-      <h3>📖 Règles du Triolet</h3>
-      <div class="rules-content">
-        <h4>But du jeu</h4>
-        <p>Marquer le plus de points en posant 1, 2 ou 3 jetons alignés sur le plateau.</p>
-
-        <h4>Placement</h4>
-        <ul>
-          <li>Chaque jeton doit être adjacent à un jeton déjà placé.</li>
-          <li>2 jetons côte à côte : somme ≤ 15.</li>
-          <li>3 jetons côte à côte : somme = 15 exactement → <strong>Trio</strong>.</li>
-          <li>Pas plus de 3 jetons dans le même alignement.</li>
-        </ul>
-
-        <h4>Score</h4>
-        <ul>
-          <li><strong>Trio</strong> (3 jetons = 15) : 15 pts + bonus 15 = <strong>30 pts</strong>.</li>
-          <li><strong>Triolet</strong> (3 jetons posés en 1 fois = 15) : 30 + <strong>50 pts</strong> bonus.</li>
-          <li>Case ×2 : double la valeur du jeton (ou du Trio entier).</li>
-          <li>Case ×3 : triple la valeur du jeton (ou du Trio entier).</li>
-          <li>Case Rejouer : le joueur rejoue immédiatement.</li>
-        </ul>
-
-        <h4>Règle du carré</h4>
-        <ul>
-          <li>Pendant le 1er tour complet : interdit de former un carré 2×2.</li>
-          <li>Ensuite : interdit de former un carré 3×3 bloquant.</li>
-        </ul>
-
-        <h4>Fin de partie</h4>
-        <p>Quand le sac est vide et qu'un joueur pose son dernier jeton,
-           il récupère la somme des jetons restants de ses adversaires.</p>
-      </div>
-      <button id="rules-close-btn" class="btn btn-primary">Fermer</button>
-    </div>
-  </div>
-
-  <script src="index.js"></script>
+<script src="index.js"></script>
 </body>
 </html>
