@@ -501,14 +501,15 @@ function aiTurn(){
   if(pl.hand.length===0){finishTurn();return;}
 
   let best=null,bestPts=-1;
+  const usedSpBackup=new Set(G.usedSp);
 
   for(let hi=0;hi<pl.hand.length;hi++){
     const tok=pl.hand[hi];
     for(let r=0;r<15;r++){
       for(let c=0;c<15;c++){
         if(G.board[r][c])continue;
-        if(!everyonePlayedOnce() && !(r===7&&c===7) && G.board[7][7]===null)continue;
-        if(G.board[7][7]!==null && !adjFixed(r,c))continue;
+        if(G.board[7][7]===null&&!(r===7&&c===7))continue;
+        if(G.board[7][7]!==null&&!adjFixed(r,c))continue;
 
         const jokerVals=tok.isJoker
           ?[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
@@ -520,25 +521,58 @@ function aiTurn(){
             val:tok.val,isJoker:tok.isJoker,
             jokerVal:tok.isJoker?jv:null
           }];
+
           if(validate().ok){
             const pts=calcPoints();
-            G.usedSp=new Set(usedSpBefore);
+            G.usedSp=new Set(usedSpBackup);
             G.rejouer=false;
+
             if(pts>bestPts){
               bestPts=pts;
               best={hi,r,c,val:tok.val,isJoker:tok.isJoker,
                     jokerVal:tok.isJoker?jv:null};
             }
           }else{
-            G.usedSp=new Set(usedSpBefore);
+            G.usedSp=new Set(usedSpBackup);
             G.rejouer=false;
           }
+
           G.pend=[];
         }
       }
     }
   }
 
+  if(best){
+    G.pend=[{...best}];
+    const pts=calcPoints();
+    pl.score+=pts;
+    addLog(`🤖 ${pl.name} → ${String.fromCharCode(65+best.r)}${best.c+1} +${pts} pts → Total ${pl.score}`,'score');
+
+    G.board[best.r][best.c]={val:best.val,isJoker:best.isJoker,jokerVal:best.jokerVal};
+    pl.hand.splice(best.hi,1);
+    pl.hand.push(...drawN(G.sac,1));
+
+    const rejouer=G.rejouer;
+    G.pend=[];G.first=false;G.rejouer=false;
+
+    if(checkEnd())return;
+    if(rejouer){finishTurn({samePlayer:true});}
+    else finishTurn();
+
+  }else{
+    if(G.sac.length>=5&&pl.hand.length>0){
+      const idx=Math.floor(Math.random()*pl.hand.length);
+      const t=pl.hand.splice(idx,1);
+      G.sac.push(...t);shuffle(G.sac);
+      pl.hand.push(...drawN(G.sac,1));
+      addLog(`🤖 ${pl.name} échange`,'i');
+    }else{
+      addLog(`🤖 ${pl.name} passe`,'i');
+    }
+    finishTurn();
+  }
+}
   if(best){
     G.pend=[{...best}];
     const pts=calcPoints();
@@ -911,20 +945,27 @@ function beginStartDraw(configs){
 
 function startGameAfterDraw(){
   if(!drawState||!drawState.ready||!pendingStartConfigs)return;
+
   G=newGame(pendingStartConfigs.slice(0,nbPlayers));
   const starter=drawState.entries[startPlayerIndex];
   G.cur=startPlayerIndex;
-  G.joueurs.forEach((j,i)=>{ if(drawState.entries[i].drawn) j.hand.unshift(drawState.entries[i].drawn); });
+
+  G.joueurs.forEach((j,i)=>{
+    if(drawState.entries[i].drawn) j.hand.unshift(drawState.entries[i].drawn);
+  });
+
   document.getElementById('screen-draw').style.display='none';
   document.getElementById('screen-game').style.display='block';
+
   buildCoords();
+  render();
+
   addLog('🎮 '+G.joueurs.map(j=>j.name).join(' vs ')+' — Bonne partie !','g');
   addLog(`🎲 ${starter.cfg.name} commence après le tirage au sort`,'i');
   addLog('📦 '+G.sac.length+' jetons dans le sac','i');
-  render();
+
   if(G.joueurs[G.cur].isAI)setTimeout(aiTurn,800);
 }
-
 // =====================================================
 //  LOBBY — Configuration joueurs
 // =====================================================
