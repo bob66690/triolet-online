@@ -451,14 +451,6 @@ function finishTurn({samePlayer=false}={}){
   nextTurn();
 }
 
-function passTurn(){
-  if(!G||G.over)return;
-  const pl=G.joueurs[G.cur];
-  if(pl.isAI)return;
-  if(G.pend.length>0){addLog('Annulez vos placements avant de passer','b');return;}
-  addLog(`⏭️ ${pl.name} passe son tour`,'i');
-  finishTurn();
-}
 
 // =====================================================
 //  FIN DE PARTIE
@@ -503,7 +495,7 @@ function showEnd(){
 function aiTurn(){
   const pl=G.joueurs[G.cur];
   if(!pl||!pl.isAI)return;
-  if(pl.hand.length===0){nextTurn();return;}
+  if(pl.hand.length===0){finishTurn();return;}
 
   let best=null,bestPts=-1;
 
@@ -512,8 +504,8 @@ function aiTurn(){
     for(let r=0;r<15;r++){
       for(let c=0;c<15;c++){
         if(G.board[r][c])continue;
-        if(G.first&&!(r===7&&c===7))continue;
-        if(!G.first&&!adjFixed(r,c))continue;
+        if(!everyonePlayedOnce() && !(r===7&&c===7) && G.board[7][7]===null)continue;
+        if(G.board[7][7]!==null && !adjFixed(r,c))continue;
 
         const jokerVals=tok.isJoker
           ?[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
@@ -780,8 +772,16 @@ function openEch(){
 }
 
 function confirmEch(){
-  if(echSel.length===0){addLog('Sélectionnez au moins 1 jeton','b');return;}
   const pl=G.joueurs[G.cur];
+
+  if(echSel.length===0){
+    addLog(`⏭️ ${pl.name} passe son tour`,'i');
+    document.getElementById('modal-ech').classList.remove('on');
+    echSel=[];
+    finishTurn();
+    return;
+  }
+
   const sorted=[...echSel].sort((a,b)=>b-a);
   const removed=sorted.map(i=>pl.hand.splice(i,1)[0]);
   G.sac.push(...removed);shuffle(G.sac);
