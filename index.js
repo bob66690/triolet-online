@@ -66,7 +66,8 @@ function newGame(configs){
     usedSp : new Set(),
     pend   : [],
     rejouer: false,
-    over   : false
+    over   : false,
+    turnCounts: configs.map(()=>0)
   };
 }
 
@@ -155,6 +156,28 @@ function adjFixed(r,c){
   return false;
 }
 
+
+function everyonePlayedOnce(){
+  return G && G.turnCounts && G.turnCounts.every(n=>n>=1);
+}
+
+function openingRoundActive(){
+  return !everyonePlayedOnce();
+}
+
+function formsForbiddenSquare(){
+  const b2=vboard();
+  for(let r=0;r<14;r++){
+    for(let c=0;c<14;c++){
+      if(b2[r][c]&&b2[r+1][c]&&b2[r][c+1]&&b2[r+1][c+1]){
+        if(G.pend.some(x=>(x.r===r||x.r===r+1)&&(x.c===c||x.c===c+1)))
+          return true;
+      }
+    }
+  }
+  return false;
+}
+
 // =====================================================
 //  VALIDATION
 // =====================================================
@@ -197,18 +220,9 @@ function validate(){
     }
   }
 
-  // Carré interdit au 1er tour uniquement
-  if(G.first){
-    const b2=vboard();
-    for(let r=0;r<14;r++){
-      for(let c=0;c<14;c++){
-        if(b2[r][c]&&b2[r+1][c]&&b2[r][c+1]&&b2[r+1][c+1]){
-          if(p.some(x=>(x.r===r||x.r===r+1)&&(x.c===c||x.c===c+1)))
-            return fail('Interdit de former un carré au 1er tour');
-        }
-      }
-    }
-  }
+  // Carré interdit tant que tous les joueurs n'ont pas encore joué une fois
+  if(openingRoundActive() && formsForbiddenSquare())
+    return fail("Interdit de former un carré tant que tous les joueurs n'ont pas joué");
 
   if(p.filter(x=>x.isJoker).length>=2)
     return fail('Interdit de poser 2 jokers au même tour');
@@ -410,11 +424,10 @@ function playMove(){
 
   if(checkEnd())return;
   if(rejouer){
-    render();
-    if(G.joueurs[G.cur].isAI)setTimeout(aiTurn,800);
+    finishTurn({samePlayer:true});
     return;
   }
-  nextTurn();
+  finishTurn();
 }
 
 // =====================================================
@@ -425,6 +438,26 @@ function nextTurn(){
   G.pend=[];selIdx=null;
   render();
   if(G.joueurs[G.cur].isAI)setTimeout(aiTurn,800);
+}
+
+function finishTurn({samePlayer=false}={}){
+  G.turnCounts[G.cur]=(G.turnCounts[G.cur]||0)+1;
+  if(samePlayer){
+    G.pend=[];selIdx=null;
+    render();
+    if(G.joueurs[G.cur].isAI)setTimeout(aiTurn,800);
+    return;
+  }
+  nextTurn();
+}
+
+function passTurn(){
+  if(!G||G.over)return;
+  const pl=G.joueurs[G.cur];
+  if(pl.isAI)return;
+  if(G.pend.length>0){addLog('Annulez vos placements avant de passer','b');return;}
+  addLog(`⏭️ ${pl.name} passe son tour`,'i');
+  finishTurn();
 }
 
 // =====================================================
@@ -520,8 +553,8 @@ function aiTurn(){
     G.pend=[];G.first=false;G.rejouer=false;
 
     if(checkEnd())return;
-    if(rejouer){render();setTimeout(aiTurn,800);}
-    else nextTurn();
+    if(rejouer){finishTurn({samePlayer:true});}
+    else finishTurn();
 
   }else{
     if(G.sac.length>=5&&pl.hand.length>0){
@@ -533,7 +566,7 @@ function aiTurn(){
     }else{
       addLog(`🤖 ${pl.name} passe`,'i');
     }
-    nextTurn();
+    finishTurn();
   }
 }
 
@@ -756,7 +789,7 @@ function confirmEch(){
   addLog(`🔄 Échange de ${removed.length} jeton(s)`,'i');
   document.getElementById('modal-ech').classList.remove('on');
   echSel=[];
-  nextTurn();
+  finishTurn();
 }
 
 // ── Journal ──
