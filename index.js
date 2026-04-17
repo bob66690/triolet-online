@@ -519,11 +519,16 @@ function aiTurn(){
           }];
           if(validate().ok){
             const pts=calcPoints();
+            G.usedSp=new Set(usedSpBefore);
+            G.rejouer=false;
             if(pts>bestPts){
               bestPts=pts;
               best={hi,r,c,val:tok.val,isJoker:tok.isJoker,
                     jokerVal:tok.isJoker?jv:null};
             }
+          }else{
+            G.usedSp=new Set(usedSpBefore);
+            G.rejouer=false;
           }
           G.pend=[];
         }
@@ -621,7 +626,7 @@ function renderBoard(){
         cell.addEventListener('click',()=>removePend(r,c));
       }else{
         if(selIdx!==null&&!G.joueurs[G.cur].isAI){
-          const canPlace = G.first
+          const canPlace = G.board[7][7]===null
             ? (r===7&&c===7)
             : (adjFixed(r,c) || G.pend.some(p=>Math.abs(p.r-r)+Math.abs(p.c-c)===1));
           if(canPlace)cell.classList.add('placeable');
