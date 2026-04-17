@@ -877,6 +877,32 @@ function beginStartDraw(configs){
   setTimeout(()=>{ if(!drawState.ready) runStartDraw(); }, 50);
 }
 
+function runStartDraw(){
+  if(!drawState)return;
+
+  const active=drawState.entries.filter(e=>drawState.active.has(e.idx));
+  const pool=drawState.pool;
+  active.forEach(e=>{ if(!e.drawn) e.drawn=pool.splice(-1,1)[0]; });
+
+  const numeric=active.map(e=>({idx:e.idx,val:e.drawn.isJoker?-1:e.drawn.val}));
+  const best=Math.max(...numeric.map(x=>x.val));
+  const winners=numeric.filter(x=>x.val===best).map(x=>x.idx);
+
+  if(winners.length===1){
+    startPlayerIndex=winners[0];
+    drawState.ready=true;
+    drawState.message=`${drawState.entries[startPlayerIndex].cfg.name} commence avec ${best}.`;
+  }else{
+    drawState.active=new Set(winners);
+    drawState.message=`Égalité à ${best}. Nouveau tirage entre ${winners.map(i=>drawState.entries[i].cfg.name).join(', ')}.`;
+  }
+  renderDrawScreen();
+  if(drawState.ready){
+    const btn=document.getElementById('btn-draw-start');
+    if(btn) btn.style.display='inline-block';
+  }
+}
+
 function startGameAfterDraw(){
   if(!drawState||!drawState.ready||!pendingStartConfigs)return;
 
@@ -1034,12 +1060,8 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   // TIRAGE AU SORT
   document.getElementById('btn-draw-start').addEventListener('click',()=>{
-    if(drawState && !drawState.ready){
-      runStartDraw();
-      setTimeout(()=>{ if(drawState&&drawState.ready) startGameAfterDraw(); }, 60);
-      return;
-    }
-    startGameAfterDraw();
+    if(drawState && !drawState.ready) runStartDraw();
+    if(drawState && drawState.ready) startGameAfterDraw();
   });
 
   // ÉCHANGER
