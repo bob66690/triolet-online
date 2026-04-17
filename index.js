@@ -591,6 +591,25 @@ function renderBoard(){
       const boardTok=G.board[r][c];
       const pendTok=G.pend.find(p=>p.r===r&&p.c===c);
 
+      if(!used&&sp){
+        const lbl=document.createElement('div');
+        lbl.className='cell-lbl';
+        if(sp==='R'){
+          lbl.innerHTML=
+            `<svg viewBox="0 0 24 24" fill="white" opacity="0.92">
+              <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6s-2.69
+              6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58
+              8-8-3.58-8-8-8z"/>
+            </svg>`;
+        }else{
+          const txt=document.createElement('span');
+          txt.className='cell-lbl-text';
+          txt.textContent=(sp==='D'||sp==='C')?'×2':'×3';
+          lbl.appendChild(txt);
+        }
+        cell.appendChild(lbl);
+      }
+
       if(boardTok){
         cell.appendChild(makeTok(boardTok,false));
       }else if(pendTok){
@@ -601,30 +620,11 @@ function renderBoard(){
         cell.appendChild(tk);
         cell.addEventListener('click',()=>removePend(r,c));
       }else{
-        if(!used&&sp){
-          const lbl=document.createElement('div');
-          lbl.className='cell-lbl';
-          if(sp==='R'){
-            lbl.innerHTML=
-              `<svg viewBox="0 0 24 24" fill="white" opacity="0.92">
-                <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6s-2.69
-                6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58
-                8-8-3.58-8-8-8z"/>
-              </svg>`;
-          }else{
-            const txt=document.createElement('span');
-            txt.className='cell-lbl-text';
-            txt.textContent=(sp==='D'||sp==='C')?'×2':'×3';
-            lbl.appendChild(txt);
-          }
-          cell.appendChild(lbl);
-        }
         if(selIdx!==null&&!G.joueurs[G.cur].isAI){
-          if(G.first){
-            if(r===7&&c===7)cell.classList.add('placeable');
-          }else{
-            if(adjFixed(r,c))cell.classList.add('placeable');
-          }
+          const canPlace = G.first
+            ? (r===7&&c===7)
+            : (adjFixed(r,c) || G.pend.some(p=>Math.abs(p.r-r)+Math.abs(p.c-c)===1));
+          if(canPlace)cell.classList.add('placeable');
         }
         cell.addEventListener('click',()=>onCellClick(r,c));
       }
