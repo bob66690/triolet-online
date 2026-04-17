@@ -937,6 +937,7 @@ function startGameAfterDraw(){
 
   if(G.joueurs[G.cur].isAI)setTimeout(aiTurn,800);
 }
+
 // =====================================================
 //  LOBBY — Configuration joueurs
 // =====================================================
