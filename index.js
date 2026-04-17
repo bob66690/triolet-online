@@ -28,7 +28,10 @@ let G       = null;
 let selIdx  = null;
 let echSel  = [];
 let jokerCB = null;
-let logMode = 'detail';
+let logMode = 'min';
+let pendingStartConfigs = null;
+let startPlayerIndex = 0;
+let drawState = null;
 
 // Config lobby
 let nbPlayers = 2;
@@ -813,6 +816,115 @@ function setLog(mode){
   document.getElementById('btn-lm').classList.toggle('on',mode==='min');
 }
 
+
+function buildStartBag(){
+  const sac=[];
+  Object.entries(DISTRIB).forEach(([v,q])=>{
+    for(let i=0;i<q;i++) sac.push({val:parseInt(v),isJoker:false,jokerVal:null});
+  });
+  sac.push({val:null,isJoker:true,jokerVal:null});
+  sac.push({val:null,isJoker:true,jokerVal:null});
+  shuffle(sac);
+  sac.splice(0,3);
+  return sac;
+}
+
+function tokLabel(t){
+  return t.isJoker?'X':String(t.val);
+}
+
+function renderDrawScreen(){
+  const list=document.getElementById('draw-list');
+  const status=document.getElementById('draw-status');
+  const btnRun=document.getElementById('btn-draw-run');
+  const btnStart=document.getElementById('btn-draw-start');
+  if(!list||!drawState)return;
+
+  list.innerHTML='';
+  drawState.entries.forEach((e,idx)=>{
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid #334155;border-radius:10px;background:#0f172a;';
+    const left=document.createElement('div');
+    left.style.cssText='display:flex;align-items:center;gap:10px;min-width:0;';
+    const badge=document.createElement('div');
+    badge.style.cssText='width:28px;height:28px;border-radius:50%;background:#334155;color:#fbbf24;font-weight:700;font-size:.85rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;';
+    badge.textContent=idx+1;
+    const name=document.createElement('div');
+    name.style.color='#e2e8f0';
+    name.textContent=(e.cfg.isAI?'🤖 ':'👤 ')+e.cfg.name;
+    left.appendChild(badge);left.appendChild(name);
+
+    const right=document.createElement('div');
+    right.style.cssText='display:flex;align-items:center;gap:10px;';
+    const tok=document.createElement('div');
+    tok.className='htok'+(e.drawn&&e.drawn.isJoker?' joker':'');
+    tok.style.minWidth='48px';
+    tok.textContent=e.drawn?tokLabel(e.drawn):'?';
+    const val=document.createElement('div');
+    val.style.cssText='color:#94a3b8;font-size:.9rem;min-width:44px;text-align:right;';
+    val.textContent=e.drawn?(e.drawn.isJoker?'joker':e.drawn.val):'—';
+    right.appendChild(tok);right.appendChild(val);
+
+    row.appendChild(left);row.appendChild(right);list.appendChild(row);
+  });
+
+  status.textContent=drawState.message||'';
+  btnRun.style.display=drawState.ready?'none':'inline-block';
+  btnStart.style.display=drawState.ready?'inline-block':'none';
+}
+
+function runStartDraw(){
+  if(!drawState)return;
+  const pool=drawState.pool;
+  const active=drawState.entries.filter(e=>drawState.active.has(e.idx));
+  active.forEach(e=>{ e.drawn = pool.splice(-1,1)[0]; });
+
+  const numeric = active.map(e=>({idx:e.idx,val:e.drawn.isJoker?-1:e.drawn.val}));
+  const best=Math.max(...numeric.map(x=>x.val));
+  const winners=numeric.filter(x=>x.val===best).map(x=>x.idx);
+
+  if(winners.length===1){
+    startPlayerIndex=winners[0];
+    drawState.ready=true;
+    drawState.message=`${drawState.entries[startPlayerIndex].cfg.name} commence avec ${best}.`;
+  }else{
+    drawState.message=`Égalité à ${best}. Nouveau tirage entre ${winners.map(i=>drawState.entries[i].cfg.name).join(', ')}.`;
+    drawState.active=new Set(winners);
+  }
+  renderDrawScreen();
+}
+
+function beginStartDraw(configs){
+  pendingStartConfigs=configs.map(c=>({...c}));
+  drawState={
+    pool: buildStartBag(),
+    entries: pendingStartConfigs.map((cfg,idx)=>({idx,cfg,drawn:null})),
+    active: new Set(pendingStartConfigs.map((_,idx)=>idx)),
+    ready:false,
+    message:''
+  };
+  document.getElementById('screen-lobby').style.display='none';
+  document.getElementById('screen-draw').style.display='block';
+  document.getElementById('screen-game').style.display='none';
+  renderDrawScreen();
+}
+
+function startGameAfterDraw(){
+  if(!drawState||!drawState.ready||!pendingStartConfigs)return;
+  G=newGame(pendingStartConfigs.slice(0,nbPlayers));
+  const starter=drawState.entries[startPlayerIndex];
+  G.cur=startPlayerIndex;
+  G.joueurs.forEach((j,i)=>{ if(drawState.entries[i].drawn) j.hand.unshift(drawState.entries[i].drawn); });
+  document.getElementById('screen-draw').style.display='none';
+  document.getElementById('screen-game').style.display='block';
+  buildCoords();
+  addLog('🎮 '+G.joueurs.map(j=>j.name).join(' vs ')+' — Bonne partie !','g');
+  addLog(`🎲 ${starter.cfg.name} commence après le tirage au sort`,'i');
+  addLog('📦 '+G.sac.length+' jetons dans le sac','i');
+  render();
+  if(G.joueurs[G.cur].isAI)setTimeout(aiTurn,800);
+}
+
 // =====================================================
 //  LOBBY — Configuration joueurs
 // =====================================================
@@ -928,18 +1040,7 @@ document.addEventListener('DOMContentLoaded',()=>{
         (playersConfig[i].isAI?`IA ${i+1}`:`Joueur ${i+1}`);
     });
 
-    G=newGame(playersConfig.slice(0,nbPlayers));
-
-    document.getElementById('screen-lobby').style.display='none';
-    document.getElementById('screen-game').style.display='block';
-
-    buildCoords();
-    addLog('🎮 '+G.joueurs.map(j=>j.name).join(' vs ')+' — Bonne partie !','g');
-    addLog('📦 '+G.sac.length+' jetons dans le sac','i');
-    render();
-
-    // Si le 1er joueur est une IA
-    if(G.joueurs[0].isAI)setTimeout(aiTurn,800);
+    beginStartDraw(playersConfig.slice(0,nbPlayers));
   });
 
   // VALIDER
@@ -954,6 +1055,10 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(!G)return;
     G.pend=[];selIdx=null;render();
   });
+
+  // TIRAGE AU SORT
+  document.getElementById('btn-draw-run').addEventListener('click',runStartDraw);
+  document.getElementById('btn-draw-start').addEventListener('click',startGameAfterDraw);
 
   // ÉCHANGER
   document.getElementById('btn-echanger').addEventListener('click',()=>{
