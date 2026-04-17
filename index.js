@@ -918,6 +918,7 @@ function startGameAfterDraw(){
   document.getElementById('screen-game').style.display='block';
 
   buildCoords();
+  render();
   requestAnimationFrame(()=>{ render(); });
 
   addLog('🎮 '+G.joueurs.map(j=>j.name).join(' vs ')+' — Bonne partie !','g');
