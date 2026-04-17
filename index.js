@@ -28,10 +28,7 @@ let G       = null;
 let selIdx  = null;
 let echSel  = [];
 let jokerCB = null;
-let logMode = 'min';
-let pendingStartConfigs = null;
-let startPlayerIndex = 0;
-let drawState = null;
+let logMode = 'detail';
 
 // Config lobby
 let nbPlayers = 2;
@@ -501,15 +498,14 @@ function aiTurn(){
   if(pl.hand.length===0){finishTurn();return;}
 
   let best=null,bestPts=-1;
-  const usedSpBackup=new Set(G.usedSp);
 
   for(let hi=0;hi<pl.hand.length;hi++){
     const tok=pl.hand[hi];
     for(let r=0;r<15;r++){
       for(let c=0;c<15;c++){
         if(G.board[r][c])continue;
-        if(G.board[7][7]===null&&!(r===7&&c===7))continue;
-        if(G.board[7][7]!==null&&!adjFixed(r,c))continue;
+        if(!everyonePlayedOnce() && !(r===7&&c===7) && G.board[7][7]===null)continue;
+        if(G.board[7][7]!==null && !adjFixed(r,c))continue;
 
         const jokerVals=tok.isJoker
           ?[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
@@ -521,22 +517,14 @@ function aiTurn(){
             val:tok.val,isJoker:tok.isJoker,
             jokerVal:tok.isJoker?jv:null
           }];
-
           if(validate().ok){
             const pts=calcPoints();
-            G.usedSp=new Set(usedSpBackup);
-            G.rejouer=false;
-
             if(pts>bestPts){
               bestPts=pts;
               best={hi,r,c,val:tok.val,isJoker:tok.isJoker,
                     jokerVal:tok.isJoker?jv:null};
             }
-          }else{
-            G.usedSp=new Set(usedSpBackup);
-            G.rejouer=false;
           }
-
           G.pend=[];
         }
       }
@@ -573,7 +561,6 @@ function aiTurn(){
     finishTurn();
   }
 }
- 
 
 // =====================================================
 //  RENDU
@@ -634,7 +621,7 @@ function renderBoard(){
         cell.addEventListener('click',()=>removePend(r,c));
       }else{
         if(selIdx!==null&&!G.joueurs[G.cur].isAI){
-          const canPlace = G.board[7][7]===null
+          const canPlace = G.first
             ? (r===7&&c===7)
             : (adjFixed(r,c) || G.pend.some(p=>Math.abs(p.r-r)+Math.abs(p.c-c)===1));
           if(canPlace)cell.classList.add('placeable');
@@ -821,113 +808,6 @@ function setLog(mode){
   document.getElementById('btn-lm').classList.toggle('on',mode==='min');
 }
 
-
-function buildStartBag(){
-  const sac=[];
-  Object.entries(DISTRIB).forEach(([v,q])=>{
-    for(let i=0;i<q;i++) sac.push({val:parseInt(v),isJoker:false,jokerVal:null});
-  });
-  sac.push({val:null,isJoker:true,jokerVal:null});
-  sac.push({val:null,isJoker:true,jokerVal:null});
-  shuffle(sac);
-  sac.splice(0,3);
-  return sac;
-}
-
-function tokLabel(t){
-  return t.isJoker?'X':String(t.val);
-}
-
-function renderDrawScreen(){
-  const list=document.getElementById('draw-list');
-  const status=document.getElementById('draw-status');
-  const btnStart=document.getElementById('btn-draw-start');
-  if(!list||!drawState)return;
-
-  list.innerHTML='';
-  drawState.entries.forEach((e,idx)=>{
-    const row=document.createElement('div');
-    row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid #334155;border-radius:10px;background:#0f172a;';
-    const name=document.createElement('div');
-    name.style.cssText='color:#e2e8f0;font-weight:700;';
-    name.textContent=(e.cfg.isAI?'🤖 ':'👤 ')+e.cfg.name;
-    const tok=document.createElement('div');
-    tok.className='htok'+(e.drawn&&e.drawn.isJoker?' joker':'');
-    tok.textContent=e.drawn?tokLabel(e.drawn):'—';
-    row.appendChild(name); row.appendChild(tok); list.appendChild(row);
-  });
-
-  status.textContent=drawState.message||'';
-  btnStart.style.display=drawState.ready?'inline-block':'none';
-}
-
-function beginStartDraw(configs){
-  pendingStartConfigs=configs.map(c=>({...c}));
-  drawState={
-    pool: buildStartBag(),
-    entries: pendingStartConfigs.map((cfg,idx)=>({idx,cfg,drawn:null})),
-    active: new Set(pendingStartConfigs.map((_,idx)=>idx)),
-    ready:false,
-    message:''
-  };
-  document.getElementById('screen-lobby').style.display='none';
-  document.getElementById('screen-draw').style.display='block';
-  document.getElementById('screen-game').style.display='none';
-  renderDrawScreen();
-  setTimeout(()=>{ if(!drawState.ready) runStartDraw(); }, 50);
-}
-
-function runStartDraw(){
-  if(!drawState)return;
-
-  const active=drawState.entries.filter(e=>drawState.active.has(e.idx));
-  const pool=drawState.pool;
-  active.forEach(e=>{ if(!e.drawn) e.drawn=pool.splice(-1,1)[0]; });
-
-  const numeric=active.map(e=>({idx:e.idx,val:e.drawn.isJoker?-1:e.drawn.val}));
-  const best=Math.max(...numeric.map(x=>x.val));
-  const winners=numeric.filter(x=>x.val===best).map(x=>x.idx);
-
-  if(winners.length===1){
-    startPlayerIndex=winners[0];
-    drawState.ready=true;
-    drawState.message=`${drawState.entries[startPlayerIndex].cfg.name} commence avec ${best}.`;
-  }else{
-    drawState.active=new Set(winners);
-    drawState.message=`Égalité à ${best}. Nouveau tirage entre ${winners.map(i=>drawState.entries[i].cfg.name).join(', ')}.`;
-  }
-  renderDrawScreen();
-  if(drawState.ready){
-    const btn=document.getElementById('btn-draw-start');
-    if(btn) btn.style.display='inline-block';
-  }
-}
-
-function startGameAfterDraw(){
-  if(!drawState||!drawState.ready||!pendingStartConfigs)return;
-
-  G=newGame(pendingStartConfigs.slice(0,nbPlayers));
-  const starter=drawState.entries[startPlayerIndex];
-  G.cur=startPlayerIndex;
-
-  G.joueurs.forEach((j,i)=>{
-    if(drawState.entries[i].drawn) j.hand.unshift(drawState.entries[i].drawn);
-  });
-
-  document.getElementById('screen-draw').style.display='none';
-  document.getElementById('screen-game').style.display='block';
-
-  buildCoords();
-  render();
-  requestAnimationFrame(()=>{ render(); });
-
-  addLog('🎮 '+G.joueurs.map(j=>j.name).join(' vs ')+' — Bonne partie !','g');
-  addLog(`🎲 ${starter.cfg.name} commence après le tirage au sort`,'i');
-  addLog('📦 '+G.sac.length+' jetons dans le sac','i');
-
-  if(G.joueurs[G.cur].isAI)setTimeout(aiTurn,800);
-}
-
 // =====================================================
 //  LOBBY — Configuration joueurs
 // =====================================================
@@ -1043,7 +923,18 @@ document.addEventListener('DOMContentLoaded',()=>{
         (playersConfig[i].isAI?`IA ${i+1}`:`Joueur ${i+1}`);
     });
 
-    beginStartDraw(playersConfig.slice(0,nbPlayers));
+    G=newGame(playersConfig.slice(0,nbPlayers));
+
+    document.getElementById('screen-lobby').style.display='none';
+    document.getElementById('screen-game').style.display='block';
+
+    buildCoords();
+    addLog('🎮 '+G.joueurs.map(j=>j.name).join(' vs ')+' — Bonne partie !','g');
+    addLog('📦 '+G.sac.length+' jetons dans le sac','i');
+    render();
+
+    // Si le 1er joueur est une IA
+    if(G.joueurs[0].isAI)setTimeout(aiTurn,800);
   });
 
   // VALIDER
@@ -1057,12 +948,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('btn-annuler').addEventListener('click',()=>{
     if(!G)return;
     G.pend=[];selIdx=null;render();
-  });
-
-  // TIRAGE AU SORT
-  document.getElementById('btn-draw-start').addEventListener('click',()=>{
-    if(drawState && !drawState.ready) runStartDraw();
-    if(drawState && drawState.ready) startGameAfterDraw();
   });
 
   // ÉCHANGER
