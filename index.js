@@ -648,7 +648,8 @@ function renderBoard(){
       const boardTok=G.board[r][c];
       const pendTok=G.pend.find(p=>p.r===r&&p.c===c);
 
-      // Afficher le label de la case spéciale UNIQUEMENT s'il n'y a pas de jeton
+      // Afficher le label de la case spéciale UNIQUEMENT si la case est vraiment vide
+      // (pas de jeton placé ET pas de jeton en préparation)
       if(!used&&sp&&!boardTok&&!pendTok){
         const lbl=document.createElement('div');
         lbl.className='cell-lbl';
