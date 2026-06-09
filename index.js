@@ -38,6 +38,53 @@ let playersConfig = [
 ];
 
 // =====================================================
+//  SAUVEGARDE / CHARGEMENT (localStorage)
+// =====================================================
+function saveGame(){
+  if(!G)return;
+  const data={
+    board: G.board,
+    sac: G.sac,
+    joueurs: G.joueurs,
+    cur: G.cur,
+    first: G.first,
+    usedSp: Array.from(G.usedSp),
+    pend: G.pend,
+    rejouer: G.rejouer,
+    over: G.over,
+    turnCounts: G.turnCounts
+  };
+  localStorage.setItem('triolet_game',JSON.stringify(data));
+}
+
+function loadGame(){
+  const saved=localStorage.getItem('triolet_game');
+  if(!saved)return null;
+  try{
+    const data=JSON.parse(saved);
+    return{
+      board: data.board,
+      sac: data.sac,
+      joueurs: data.joueurs,
+      cur: data.cur,
+      first: data.first,
+      usedSp: new Set(data.usedSp),
+      pend: data.pend,
+      rejouer: data.rejouer,
+      over: data.over,
+      turnCounts: data.turnCounts
+    };
+  }catch(e){
+    console.error('Erreur chargement partie:',e);
+    return null;
+  }
+}
+
+function clearSavedGame(){
+  localStorage.removeItem('triolet_game');
+}
+
+// =====================================================
 //  CRÉATION
 // =====================================================
 function newGame(configs){
@@ -426,6 +473,7 @@ function playMove(){
   const rejouer=G.rejouer;
   G.pend=[];selIdx=null;G.first=false;G.rejouer=false;
 
+  saveGame();
   if(checkEnd())return;
   if(rejouer){
     finishTurn({samePlayer:true});
@@ -548,6 +596,7 @@ function aiTurn(){
     const rejouer=G.rejouer;
     G.pend=[];G.first=false;G.rejouer=false;
 
+    saveGame();
     if(checkEnd())return;
     if(rejouer){finishTurn({samePlayer:true});}
     else finishTurn();
@@ -565,6 +614,7 @@ function aiTurn(){
     }else{
       addLog(`🤖 ${pl.name} passe`,'i');
     }
+    saveGame();
     finishTurn();
   }
 }
@@ -789,6 +839,7 @@ function confirmEch(){
     addLog(`⏭️ ${pl.name} passe son tour`,'i');
     document.getElementById('modal-ech').classList.remove('on');
     echSel=[];
+    saveGame();
     finishTurn();
     return;
   }
@@ -800,6 +851,7 @@ function confirmEch(){
   addLog(`🔄 Échange de ${removed.length} jeton(s)`,'i');
   document.getElementById('modal-ech').classList.remove('on');
   echSel=[];
+  saveGame();
   finishTurn();
 }
 
@@ -942,6 +994,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     buildCoords();
     addLog('🎮 '+G.joueurs.map(j=>j.name).join(' vs ')+' — Bonne partie !','g');
     addLog('📦 '+G.sac.length+' jetons dans le sac','i');
+    saveGame();
     render();
 
     // Si le 1er joueur est une IA
@@ -968,7 +1021,10 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
 
   // QUITTER
-  document.getElementById('btn-quitter').addEventListener('click',()=>location.reload());
+  document.getElementById('btn-quitter').addEventListener('click',()=>{
+    clearSavedGame();
+    location.reload();
+  });
 
   // JOKER annuler
   document.getElementById('btn-joker-cancel').addEventListener('click',()=>{
@@ -984,9 +1040,25 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
 
   // FIN
-  document.getElementById('btn-rejouer').addEventListener('click',()=>location.reload());
+  document.getElementById('btn-rejouer').addEventListener('click',()=>{
+    clearSavedGame();
+    location.reload();
+  });
 
   // JOURNAL
   document.getElementById('btn-ld').addEventListener('click',()=>setLog('detail'));
   document.getElementById('btn-lm').addEventListener('click',()=>setLog('min'));
+
+  // ── CHARGEMENT PARTIE SAUVEGARDÉE ──
+  const saved=loadGame();
+  if(saved){
+    // Une partie est en cours
+    G=saved;
+    document.getElementById('screen-lobby').style.display='none';
+    document.getElementById('screen-game').style.display='block';
+    buildCoords();
+    addLog('📥 Partie restaurée !','g');
+    render();
+    if(!G.over&&G.joueurs[G.cur].isAI)setTimeout(aiTurn,800);
+  }
 });
