@@ -316,6 +316,7 @@ function calcPoints(){
 
       // Chercher la meilleure case spéciale parmi les jetons
       // NOUVEAUX de cette ligne (au choix du joueur → on prend le max)
+      // FIX: N'ajouter à usedSp que si c'est VRAIMENT un jeton nouveau et utilisable
       for(const p of G.pend){
         if(!line.some(l=>l.r===p.r&&l.c===p.c))continue;
         const sp=specAt(p.r,p.c);
@@ -340,8 +341,11 @@ function calcPoints(){
         msg+=` (joker inclus — pas de bonus triolet)`;
       }
 
-      // Marquer la case spéciale comme utilisée
-      if(spKey)G.usedSp.add(spKey);
+      // Marquer la case spéciale comme utilisée SEULEMENT SI elle existe
+      // et n'a pas déjà été utilisée (specAt retourne null si déjà utilisée)
+      if(spKey){
+        G.usedSp.add(spKey);
+      }
 
       total+=pts;
       addLog(msg,'p');
@@ -591,7 +595,8 @@ function renderBoard(){
       const boardTok=G.board[r][c];
       const pendTok=G.pend.find(p=>p.r===r&&p.c===c);
 
-      if(!used&&sp){
+      // Afficher le label de la case spéciale UNIQUEMENT s'il n'y a pas de jeton
+      if(!used&&sp&&!boardTok&&!pendTok){
         const lbl=document.createElement('div');
         lbl.className='cell-lbl';
         if(sp==='R'){
