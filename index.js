@@ -553,11 +553,14 @@ function aiTurn(){
     else finishTurn();
 
   }else{
-    if(G.sac.length>=5&&pl.hand.length>0){
+    // FIX : Permettre de passer même avec < 5 jetons dans le sac
+    // et d'échanger jusqu'à max(3, G.sac.length) jetons
+    if(pl.hand.length>0){
       const idx=Math.floor(Math.random()*pl.hand.length);
       const t=pl.hand.splice(idx,1);
       G.sac.push(...t);shuffle(G.sac);
-      pl.hand.push(...drawN(G.sac,1));
+      const nToReturn=Math.min(1,G.sac.length);
+      pl.hand.push(...drawN(G.sac,nToReturn));
       addLog(`🤖 ${pl.name} échange`,'i');
     }else{
       addLog(`🤖 ${pl.name} passe`,'i');
@@ -754,12 +757,15 @@ function openJoker(cb){
 function openEch(){
   if(G.joueurs[G.cur].isAI)return;
   if(G.pend.length>0){addLog('Annulez vos placements avant d\'échanger','b');return;}
-  if(G.sac.length<5){addLog('Il faut ≥5 jetons dans le sac pour échanger','b');return;}
 
   echSel=[];
   const pl=G.joueurs[G.cur];
   const ct=document.getElementById('ech-toks');
   ct.innerHTML='';
+
+  // FIX: Calculer le nombre max d'échanges possibles
+  // = min(3 jetons à la main, jetons disponibles dans le sac)
+  const maxEch=Math.min(3,G.sac.length);
 
   pl.hand.forEach((t,i)=>{
     const d=document.createElement('div');
@@ -769,7 +775,7 @@ function openEch(){
     d.addEventListener('click',()=>{
       const idx=echSel.indexOf(i);
       if(idx>-1){echSel.splice(idx,1);d.classList.remove('sel');}
-      else if(echSel.length<3){echSel.push(i);d.classList.add('sel');}
+      else if(echSel.length<maxEch){echSel.push(i);d.classList.add('sel');}
     });
     ct.appendChild(d);
   });
