@@ -295,193 +295,196 @@ function fail(msg){return{ok:false,msg};}
 //    Mais si la case ×2 est dans un TRIO → le trio entier est ×2 (30×2=60)
 // =====================================================
 function calcPoints(){
-  let total=0;
-  const lines=affectedLines();
-  const hasJok=G.pend.some(p=>p.isJoker);
+  let total = 0;
+  const usedKeys = new Set();
+  let rejouer = false;
+
+  const lines = affectedLines();
+  const hasJok = G.pend.some(p => p.isJoker);
 
   // ── Cas : 1 seul jeton posé sans voisin ──
-  if(G.pend.length===1&&lines.length===0){
-    const p=G.pend[0];
-    const sp=specAt(p.r,p.c);
-    const sv=scoreVal({val:p.val,isJoker:p.isJoker,jokerVal:p.jokerVal});
+  if(G.pend.length === 1 && lines.length === 0){
+    const p = G.pend[0];
+    const sp = specAt(p.r, p.c);
+    const sv = scoreVal({val:p.val, isJoker:p.isJoker, jokerVal:p.jokerVal});
 
-    if(sp==='C'||sp==='D'){
-      const pts=sv*2;
-      G.usedSp.add(p.r+','+p.c);
-      total+=pts;
-      addLog(p.isJoker
-        ?`Joker sur ×2 : 0×2 = 0 pt`
-        :`Case ×2 : ${sv}×2 = ${pts} pts`,'p');
-    }else if(sp==='T'){
-      const pts=sv*3;
-      G.usedSp.add(p.r+','+p.c);
-      total+=pts;
-      addLog(p.isJoker
-        ?`Joker sur ×3 : 0×3 = 0 pt`
-        :`Case ×3 : ${sv}×3 = ${pts} pts`,'p');
+    if(sp === 'C' || sp === 'D'){
+      const pts = sv * 2;
+      usedKeys.add(p.r + ',' + p.c);
+      total += pts;
+      addLog(
+        p.isJoker
+          ? `Joker sur ×2 : 0×2 = 0 pt`
+          : `Case ×2 : ${sv}×2 = ${pts} pts`,
+        'p'
+      );
+    }else if(sp === 'T'){
+      const pts = sv * 3;
+      usedKeys.add(p.r + ',' + p.c);
+      total += pts;
+      addLog(
+        p.isJoker
+          ? `Joker sur ×3 : 0×3 = 0 pt`
+          : `Case ×3 : ${sv}×3 = ${pts} pts`,
+        'p'
+      );
     }else{
-      addLog(`Jeton posé seul — 0 pt`,'i');
+      addLog(`Jeton posé seul — 0 pt`, 'i');
     }
-    if(sp==='R'){
-      G.usedSp.add(p.r+','+p.c);
-      G.rejouer=true;
-      addLog('🔁 Case Rejouer !','g');
+
+    if(sp === 'R'){
+      usedKeys.add(p.r + ',' + p.c);
+      rejouer = true;
+      addLog('🔁 Case Rejouer !', 'g');
     }
-    return total;
+
+    return { pts: total, usedKeys, rejouer };
   }
 
   // ── Détection Triolet ──
-  // 3 jetons TOUS nouveaux, même ligne, somme=15, SANS joker
-  let isTriolet=false,trioletLineId=-1;
-  if(G.pend.length===3&&!hasJok){
-    lines.forEach((line,idx)=>{
-      if(line.length!==3)return;
-      const allNew=line.every(l=>G.pend.some(p=>p.r===l.r&&p.c===l.c));
-      if(!allNew)return;
-      const sum=line.map(l=>ev(l.tok)).reduce((a,b)=>a+b,0);
-      if(sum===15){isTriolet=true;trioletLineId=idx;}
+  let isTriolet = false, trioletLineId = -1;
+  if(G.pend.length === 3 && !hasJok){
+    lines.forEach((line, idx) => {
+      if(line.length !== 3) return;
+      const allNew = line.every(l => G.pend.some(p => p.r === l.r && p.c === l.c));
+      if(!allNew) return;
+      const sum = line.map(l => ev(l.tok)).reduce((a,b) => a+b, 0);
+      if(sum === 15){
+        isTriolet = true;
+        trioletLineId = idx;
+      }
     });
   }
 
   // ── Calcul ligne par ligne ──
-  lines.forEach((line,lineIdx)=>{
-    const len=line.length;
-    const evVals=line.map(l=>ev(l.tok));
-    const evSum=evVals.reduce((a,b)=>a+b,0);
+  lines.forEach((line, lineIdx) => {
+    const len = line.length;
+    const evVals = line.map(l => ev(l.tok));
+    const evSum = evVals.reduce((a,b) => a+b, 0);
 
-    if(len===3&&evSum===15){
-      // ════════════════════════════════════════
-      //  TRIO — règle officielle :
-      //  Le trio vaut 30 pts de base.
-      //  Si UN des jetons posés est sur case ×2 → 30×2 = 60
-      //  Si UN des jetons posés est sur case ×3 → 30×3 = 90
-      //  La case spéciale s'applique au TRIO ENTIER (pas au jeton seul)
-      //  Un seul multiplicateur par trio (le plus grand disponible)
-      // ════════════════════════════════════════
-      let mult=1;
-      let spKey=null;
+    if(len === 3 && evSum === 15){
+      let mult = 1;
+      let spKey = null;
 
-      // Chercher la meilleure case spéciale parmi les jetons
-      // NOUVEAUX de cette ligne (au choix du joueur → on prend le max)
-      // FIX: N'ajouter à usedSp que si c'est VRAIMENT un jeton nouveau et utilisable
       for(const p of G.pend){
-        if(!line.some(l=>l.r===p.r&&l.c===p.c))continue;
-        const sp=specAt(p.r,p.c);
-        if((sp==='D'||sp==='C')&&mult<2){
-          mult=2;spKey=p.r+','+p.c;
+        if(!line.some(l => l.r === p.r && l.c === p.c)) continue;
+        const sp = specAt(p.r, p.c);
+        if((sp === 'D' || sp === 'C') && mult < 2){
+          mult = 2;
+          spKey = p.r + ',' + p.c;
         }
-        if(sp==='T'&&mult<3){
-          mult=3;spKey=p.r+','+p.c;
+        if(sp === 'T' && mult < 3){
+          mult = 3;
+          spKey = p.r + ',' + p.c;
         }
       }
 
-      let pts=30*mult;
-      let msg=`Trio (${evVals.join('+')}=15)`;
-      if(mult>1) msg+=` sur case ×${mult}`;
-      msg+=` = ${30*mult} pts`;
+      let pts = 30 * mult;
+      let msg = `Trio (${evVals.join('+')}=15)`;
+      if(mult > 1) msg += ` sur case ×${mult}`;
+      msg += ` = ${30 * mult} pts`;
 
-      // Bonus Triolet (seulement si pas de joker)
-      if(isTriolet&&lineIdx===trioletLineId&&!hasJok){
-        pts+=50;
-        msg=`🎉 TRIOLET ! ${msg} + 50 bonus = ${pts} pts`;
+      if(isTriolet && lineIdx === trioletLineId && !hasJok){
+        pts += 50;
+        msg = `🎉 TRIOLET ! ${msg} + 50 bonus = ${pts} pts`;
       }else if(hasJok){
-        msg+=` (joker inclus — pas de bonus triolet)`;
+        msg += ` (joker inclus — pas de bonus triolet)`;
       }
 
-      // Marquer la case spéciale comme utilisée SEULEMENT SI elle existe
-      // et n'a pas déjà été utilisée (specAt retourne null si déjà utilisée)
       if(spKey){
-        G.usedSp.add(spKey);
+        usedKeys.add(spKey);
       }
 
-      total+=pts;
-      addLog(msg,'p');
+      total += pts;
+      addLog(msg, 'p');
 
-    }else if(len===2){
-      // ════════════════════════════════════════
-      //  PAIRE — règle officielle :
-      //  Somme des scoreVal (joker = 0)
-      //  La case spéciale s'applique UNIQUEMENT
-      //  sur la valeur du jeton nouvellement posé
-      //  (pas sur la somme totale)
-      // ════════════════════════════════════════
-      let pts=0;
-      const detail=[];
+    }else if(len === 2){
+      let pts = 0;
+      const detail = [];
 
-      line.forEach(item=>{
-        const sv=scoreVal(item.tok); // 0 si joker
-        const isNew=G.pend.some(p=>p.r===item.r&&p.c===item.c);
+      line.forEach(item => {
+        const sv = scoreVal(item.tok);
+        const isNew = G.pend.some(p => p.r === item.r && p.c === item.c);
 
         if(isNew){
-          const sp=specAt(item.r,item.c);
-          if(sp==='D'||sp==='C'){
-            pts+=sv*2;
-            G.usedSp.add(item.r+','+item.c);
-            detail.push(item.tok.isJoker?`X(×2=0)`:`${sv}×2=${sv*2}`);
-          }else if(sp==='T'){
-            pts+=sv*3;
-            G.usedSp.add(item.r+','+item.c);
-            detail.push(item.tok.isJoker?`X(×3=0)`:`${sv}×3=${sv*3}`);
+          const sp = specAt(item.r, item.c);
+          if(sp === 'D' || sp === 'C'){
+            pts += sv * 2;
+            usedKeys.add(item.r + ',' + item.c);
+            detail.push(item.tok.isJoker ? `X(×2=0)` : `${sv}×2=${sv*2}`);
+          }else if(sp === 'T'){
+            pts += sv * 3;
+            usedKeys.add(item.r + ',' + item.c);
+            detail.push(item.tok.isJoker ? `X(×3=0)` : `${sv}×3=${sv*3}`);
           }else{
-            pts+=sv;
-            detail.push(item.tok.isJoker?`X(=0)`:`${sv}`);
+            pts += sv;
+            detail.push(item.tok.isJoker ? `X(=0)` : `${sv}`);
           }
         }else{
-          // Jeton déjà en place : sa valeur brute (scoreVal)
-          pts+=sv;
+          pts += sv;
           detail.push(`${sv}`);
         }
       });
 
-      total+=pts;
-      addLog(`Paire (${detail.join('+')} = ${pts} pts)`,'i');
+      total += pts;
+      addLog(`Paire (${detail.join('+')} = ${pts} pts)`, 'i');
     }
-    // len===1 seul dans une ligne : pas de points (déjà géré plus haut)
   });
 
   // ── Case Rejouer ──
-  G.pend.forEach(p=>{
-    if(specAt(p.r,p.c)==='R'){
-      G.usedSp.add(p.r+','+p.c);
-      G.rejouer=true;
-      addLog('🔁 Case Rejouer !','g');
+  G.pend.forEach(p => {
+    if(specAt(p.r, p.c) === 'R'){
+      usedKeys.add(p.r + ',' + p.c);
+      rejouer = true;
+      addLog('🔁 Case Rejouer !', 'g');
     }
   });
 
-  return total;
+  return { pts: total, usedKeys, rejouer };
 }
-
 // =====================================================
 //  JOUER UN COUP
 // =====================================================
 function playMove(){
-  const v=validate();
-  if(!v.ok){addLog('❌ '+v.msg,'b');return;}
+  const v = validate();
+  if(!v.ok){
+    addLog('❌ ' + v.msg, 'b');
+    return;
+  }
 
-  const pts=calcPoints();
-  const pl=G.joueurs[G.cur];
-  pl.score+=pts;
+  const res = calcPoints();
+  const pts = res.pts;
+  const pl = G.joueurs[G.cur];
+
+  res.usedKeys.forEach(k => G.usedSp.add(k));
+  G.rejouer = res.rejouer;
+
+  pl.score += pts;
   addLog(`✅ ${pl.name} : +${pts} pt${pts!==1?'s':''} → Total ${pl.score}`,'score');
 
-  G.pend.forEach(p=>{
-    G.board[p.r][p.c]={val:p.val,isJoker:p.isJoker,jokerVal:p.jokerVal};
+  G.pend.forEach(p => {
+    G.board[p.r][p.c] = {val:p.val, isJoker:p.isJoker, jokerVal:p.jokerVal};
   });
-  const idxs=[...new Set(G.pend.map(p=>p.hi))].sort((a,b)=>b-a);
-  idxs.forEach(i=>pl.hand.splice(i,1));
-  pl.hand.push(...drawN(G.sac,idxs.length));
 
-  const rejouer=G.rejouer;
-  G.pend=[];selIdx=null;G.first=false;G.rejouer=false;
+  const idxs = [...new Set(G.pend.map(p => p.hi))].sort((a,b) => b-a);
+  idxs.forEach(i => pl.hand.splice(i,1));
+  pl.hand.push(...drawN(G.sac, idxs.length));
+
+  const rejouerNow = G.rejouer;
+  G.pend = [];
+  selIdx = null;
+  G.first = false;
+  G.rejouer = false;
 
   saveGame();
-  if(checkEnd())return;
-  if(rejouer){
+  if(checkEnd()) return;
+
+  if(rejouerNow){
     finishTurn({samePlayer:true});
     return;
   }
   finishTurn();
 }
-
 // =====================================================
 //  TOUR SUIVANT
 // =====================================================
@@ -545,80 +548,103 @@ function showEnd(){
 //  IA
 // =====================================================
 function aiTurn(){
-  const pl=G.joueurs[G.cur];
-  if(!pl||!pl.isAI)return;
-  if(pl.hand.length===0){finishTurn();return;}
+  const pl = G.joueurs[G.cur];
+  if(!pl || !pl.isAI) return;
+  if(pl.hand.length === 0){
+    finishTurn();
+    return;
+  }
 
-  let best=null,bestPts=-1;
+  let best = null, bestPts = -1;
 
-  for(let hi=0;hi<pl.hand.length;hi++){
-    const tok=pl.hand[hi];
-    for(let r=0;r<15;r++){
-      for(let c=0;c<15;c++){
-        if(G.board[r][c])continue;
-        if(!everyonePlayedOnce() && !(r===7&&c===7) && G.board[7][7]===null)continue;
-        if(G.board[7][7]!==null && !adjFixed(r,c))continue;
+  for(let hi = 0; hi < pl.hand.length; hi++){
+    const tok = pl.hand[hi];
 
-        const jokerVals=tok.isJoker
-          ?[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
-          :[null];
+    for(let r = 0; r < 15; r++){
+      for(let c = 0; c < 15; c++){
+        if(G.board[r][c]) continue;
+        if(!everyonePlayedOnce() && !(r===7 && c===7) && G.board[7][7]===null) continue;
+        if(G.board[7][7]!==null && !adjFixed(r,c)) continue;
+
+        const jokerVals = tok.isJoker ? [...Array(16).keys()] : [null];
 
         for(const jv of jokerVals){
-          G.pend=[{
-            hi,r,c,
-            val:tok.val,isJoker:tok.isJoker,
-            jokerVal:tok.isJoker?jv:null
+          G.pend = [{
+            hi, r, c,
+            val: tok.val,
+            isJoker: tok.isJoker,
+            jokerVal: tok.isJoker ? jv : null
           }];
+
           if(validate().ok){
-            const pts=calcPoints();
-            if(pts>bestPts){
-              bestPts=pts;
-              best={hi,r,c,val:tok.val,isJoker:tok.isJoker,
-                    jokerVal:tok.isJoker?jv:null};
+            const res = calcPoints();
+            const pts = res.pts;
+            if(pts > bestPts){
+              bestPts = pts;
+              best = {
+                hi, r, c,
+                val: tok.val,
+                isJoker: tok.isJoker,
+                jokerVal: tok.isJoker ? jv : null
+              };
             }
           }
-          G.pend=[];
+
+          G.pend = [];
         }
       }
     }
   }
 
   if(best){
-    G.pend=[{...best}];
-    const pts=calcPoints();
-    pl.score+=pts;
+    G.pend = [{...best}];
+
+    const res = calcPoints();
+    const pts = res.pts;
+    res.usedKeys.forEach(k => G.usedSp.add(k));
+    G.rejouer = res.rejouer;
+
+    pl.score += pts;
     addLog(`🤖 ${pl.name} → ${String.fromCharCode(65+best.r)}${best.c+1} +${pts} pts → Total ${pl.score}`,'score');
 
-    G.board[best.r][best.c]={val:best.val,isJoker:best.isJoker,jokerVal:best.jokerVal};
-    pl.hand.splice(best.hi,1);
-    pl.hand.push(...drawN(G.sac,1));
+    G.board[best.r][best.c] = {
+      val: best.val,
+      isJoker: best.isJoker,
+      jokerVal: best.jokerVal
+    };
 
-    const rejouer=G.rejouer;
-    G.pend=[];G.first=false;G.rejouer=false;
+    pl.hand.splice(best.hi, 1);
+    pl.hand.push(...drawN(G.sac, 1));
+
+    const rejouerNow = G.rejouer;
+    G.pend = [];
+    G.first = false;
+    G.rejouer = false;
 
     saveGame();
-    if(checkEnd())return;
-    if(rejouer){finishTurn({samePlayer:true});}
-    else finishTurn();
+    if(checkEnd()) return;
 
-  }else{
-    // FIX : Permettre de passer même avec < 5 jetons dans le sac
-    // et d'échanger jusqu'à max(3, G.sac.length) jetons
-    if(pl.hand.length>0){
-      const idx=Math.floor(Math.random()*pl.hand.length);
-      const t=pl.hand.splice(idx,1);
-      G.sac.push(...t);shuffle(G.sac);
-      const nToReturn=Math.min(1,G.sac.length);
-      pl.hand.push(...drawN(G.sac,nToReturn));
-      addLog(`🤖 ${pl.name} échange`,'i');
+    if(rejouerNow){
+      finishTurn({samePlayer:true});
     }else{
-      addLog(`🤖 ${pl.name} passe`,'i');
+      finishTurn();
+    }
+  }else{
+    if(pl.hand.length > 0){
+      const idx = Math.floor(Math.random() * pl.hand.length);
+      const t = pl.hand.splice(idx,1);
+      G.sac.push(...t);
+      shuffle(G.sac);
+      const nToReturn = Math.min(1, G.sac.length);
+      pl.hand.push(...drawN(G.sac, nToReturn));
+      addLog(`🤖 ${pl.name} échange`, 'i');
+    }else{
+      addLog(`🤖 ${pl.name} passe`, 'i');
     }
     saveGame();
     finishTurn();
   }
 }
-
 // =====================================================
 //  RENDU
 // =====================================================
