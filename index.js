@@ -722,15 +722,32 @@ for(const hi of handOrder){
 
 
 
-if(pts > bestPts){
-    bestPts = pts;
-              best = {
-                hi, r, c,
-                val: tok.val,
-                isJoker: tok.isJoker,
-                jokerVal: tok.isJoker ? jv : null
-              };
-            }
+let evalScore = pts;
+
+const sp = SPECS[r + ',' + c];
+
+if(sp === 'T')
+    evalScore += 15;
+
+if(sp === 'D' || sp === 'C')
+    evalScore += 8;
+
+if(sp === 'R')
+    evalScore += 12;
+
+if(evalScore > bestPts){
+
+    bestPts = evalScore;
+
+    best = {
+      hi,
+      r,
+      c,
+      val: tok.val,
+      isJoker: tok.isJoker,
+      jokerVal: tok.isJoker ? jv : null
+    };
+}
           }
 
           G.pend = [];
