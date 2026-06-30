@@ -518,7 +518,34 @@ header h1{
 }
 .finrow:last-child{border-bottom:none;}
 .finpts{font-weight:800;color:#fbbf24;}
+.start-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:10px;
+  margin-bottom:8px;
+  background:#0f172a;
+  border:1px solid #334155;
+  border-radius:8px;
+}
 
+.start-player{
+  font-weight:700;
+}
+
+.start-token{
+  width:46px;
+  height:46px;
+  background:linear-gradient(145deg,#fef9e7,#f5d76e);
+  border:2px solid #c9a227;
+  border-radius:6px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#1a1a1a;
+  font-weight:900;
+  font-size:1.2rem;
+}
 /* ===== RESPONSIVE ===== */
 :root{
   --cs:38px;
@@ -673,6 +700,37 @@ header h1{
   </div>
 </div>
 
+
+<!-- MODAL TIRAGE DU PREMIER JOUEUR -->
+<div class="overlay" id="modal-start">
+  <div class="modal">
+
+    <h2>🎲 Tirage au sort</h2>
+
+    <p class="sub">
+      Chaque joueur révèle son plus fort jeton
+    </p>
+
+    <div id="start-draw-results"></div>
+
+    <div id="start-winner"
+         style="
+           text-align:center;
+           color:#22c55e;
+           font-weight:800;
+           margin:16px 0;
+           font-size:1rem;">
+    </div>
+
+    <button
+      id="btn-start-game"
+      class="btn btn-green"
+      style="width:100%;padding:12px;">
+      ▶ Commencer la partie
+    </button>
+
+  </div>
+</div>
 <script src="index.js"></script>
 </body>
 </html>

@@ -47,7 +47,8 @@ function saveGame(){
     sac: G.sac,
     joueurs: G.joueurs,
     cur: G.cur,
-    first: G.first,
+    startPlayer: G.startPlayer,
+	first: G.first,
     usedSp: Array.from(G.usedSp),
     pend: G.pend,
     rejouer: G.rejouer,
@@ -62,11 +63,13 @@ function loadGame(){
   if(!saved)return null;
   try{
     const data=JSON.parse(saved);
-    return{
+   
+return{
       board: data.board,
       sac: data.sac,
       joueurs: data.joueurs,
       cur: data.cur,
+      startPlayer: data.startPlayer || data.cur,
       first: data.first,
       usedSp: new Set(data.usedSp),
       pend: data.pend,
@@ -109,6 +112,7 @@ function newGame(configs){
     board  : Array(15).fill(null).map(()=>Array(15).fill(null)),
     sac, joueurs,
     cur    : 0,
+	startPlayer : 0,
     first  : true,
     usedSp : new Set(),
     pend   : [],
@@ -547,6 +551,63 @@ function showEnd(){
 // =====================================================
 //  IA
 // =====================================================
+function canPair(v1,v2){
+
+  if(v1===null || v2===null)
+    return false;
+
+  return (v1+v2)<=15;
+}
+function tileValue(t){
+  return t.isJoker ? 0 : t.val;
+}
+function hasPotentialTriolet(pl){
+
+  if(pl.hand.length !== 3)
+    return false;
+
+  const sum = pl.hand.reduce(
+    (a,t)=>a + tileValue(t),
+    0
+  );
+
+  return sum === 15;
+}
+function tryThreeTileMove(pl){
+
+  if(pl.hand.length !== 3)
+    return null;
+
+  const vals = pl.hand.map(t =>
+    t.isJoker ? 0 : t.val
+  );
+
+  const sum =
+    vals[0] + vals[1] + vals[2];
+
+  if(sum !== 15)
+    return null;
+
+  return true;
+}
+function tryTwoTileMove(pl){
+
+  for(let h1=0; h1<pl.hand.length; h1++){
+
+    for(let h2=h1+1; h2<pl.hand.length; h2++){
+
+      const v1 = tileValue(pl.hand[h1]);
+      const v2 = tileValue(pl.hand[h2]);
+
+      if(v1 + v2 > 15)
+        continue;
+
+      return true;
+    }
+  }
+
+  return false;
+}
 function aiTurn(){
   const pl = G.joueurs[G.cur];
   if(!pl || !pl.isAI) return;
@@ -554,10 +615,24 @@ function aiTurn(){
     finishTurn();
     return;
   }
+  
+  const hasTriolet =
+  tryThreeTileMove(pl);
+
+const hasPair =
+  tryTwoTileMove(pl);
+  
+const tryTriolet = hasPotentialTriolet(pl);
 
   let best = null, bestPts = -1;
 
-  for(let hi = 0; hi < pl.hand.length; hi++){
+
+const handOrder = tryTriolet
+  ? [0,1,2]
+  : [0,1,2];
+
+for(const hi of handOrder){
+
     const tok = pl.hand[hi];
 
     for(let r = 0; r < 15; r++){
@@ -579,8 +654,11 @@ function aiTurn(){
           if(validate().ok){
             const res = calcPoints();
             const pts = res.pts;
-            if(pts > bestPts){
-              bestPts = pts;
+
+
+
+if(pts > bestPts){
+    bestPts = pts;
               best = {
                 hi, r, c,
                 val: tok.val,
@@ -630,21 +708,46 @@ function aiTurn(){
       finishTurn();
     }
   }else{
-    if(pl.hand.length > 0){
-      const idx = Math.floor(Math.random() * pl.hand.length);
-      const t = pl.hand.splice(idx,1);
-      G.sac.push(...t);
-      shuffle(G.sac);
-      const nToReturn = Math.min(1, G.sac.length);
-      pl.hand.push(...drawN(G.sac, nToReturn));
-      addLog(`🤖 ${pl.name} échange`, 'i');
-    }else{
-      addLog(`🤖 ${pl.name} passe`, 'i');
+
+    if(G.sac.length === 0){
+
+        addLog(
+          `🤖 ${pl.name} ne trouve aucun coup et passe`,
+          'i'
+        );
+
+        saveGame();
+        finishTurn();
+        return;
     }
+
+    if(pl.hand.length > 0){
+
+        const idx =
+          Math.floor(Math.random() * pl.hand.length);
+
+        const t = pl.hand.splice(idx,1);
+
+        G.sac.push(...t);
+
+        shuffle(G.sac);
+
+        pl.hand.push(...drawN(G.sac,1));
+
+        addLog(
+          `🤖 ${pl.name} échange un jeton`,
+          'i'
+        );
+    }
+
     saveGame();
     finishTurn();
-  }
 }
+
+}
+
+
+
 // =====================================================
 //  RENDU
 // =====================================================
@@ -834,7 +937,13 @@ function openJoker(cb){
 function openEch(){
   if(G.joueurs[G.cur].isAI)return;
   if(G.pend.length>0){addLog('Annulez vos placements avant d\'échanger','b');return;}
-
+if(G.sac.length < 5){
+    addLog(
+      "❌ Échange interdit : moins de 5 jetons dans le sac",
+      "b"
+    );
+    return;
+}
   echSel=[];
   const pl=G.joueurs[G.cur];
   const ct=document.getElementById('ech-toks');
@@ -972,7 +1081,53 @@ function buildPlayersConfig(){
     ct.appendChild(row);
   });
 }
+function prepareStartDraw(){
 
+    let bestValue = -1;
+    let winnerIndex = 0;
+
+    const rows = [];
+
+    G.joueurs.forEach((j,i)=>{
+
+        const highest = Math.max(
+            ...j.hand.map(t => t.isJoker ? -1 : t.val)
+        );
+
+        rows.push({
+            player:j,
+            highest
+        });
+
+        if(highest > bestValue){
+            bestValue = highest;
+            winnerIndex = i;
+        }
+    });
+
+    G.cur = winnerIndex;
+    G.startPlayer = winnerIndex;
+
+    const ct = document.getElementById('start-draw-results');
+
+    ct.innerHTML = rows.map(r=>`
+        <div class="start-row">
+            <span class="start-player">
+                ${r.player.isAI ? '🤖' : '👤'} ${r.player.name}
+            </span>
+
+            <div class="start-token">
+                ${r.highest < 0 ? 'X' : r.highest}
+            </div>
+        </div>
+    `).join('');
+
+    document.getElementById('start-winner').innerHTML =
+        `🏆 ${G.joueurs[winnerIndex].name} commence avec ${bestValue}`;
+
+    document.getElementById('modal-start')
+        .classList.add('on');
+}
 // =====================================================
 //  INIT
 // =====================================================
@@ -1019,13 +1174,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     document.getElementById('screen-game').style.display='block';
 
     buildCoords();
-    addLog('🎮 '+G.joueurs.map(j=>j.name).join(' vs ')+' — Bonne partie !','g');
-    addLog('📦 '+G.sac.length+' jetons dans le sac','i');
-    saveGame();
-    render();
-
-    // Si le 1er joueur est une IA
-    if(G.joueurs[0].isAI)setTimeout(aiTurn,800);
+	prepareStartDraw();
   });
 
   // VALIDER
@@ -1072,6 +1221,37 @@ document.addEventListener('DOMContentLoaded',()=>{
     location.reload();
   });
 
+  document
+  .getElementById('btn-start-game')
+  .addEventListener('click',()=>{
+
+      document
+        .getElementById('modal-start')
+        .classList.remove('on');
+
+      addLog(
+        '🎮 '+
+        G.joueurs.map(j=>j.name).join(' vs ')+
+        ' — Bonne partie !',
+        'g'
+      );
+
+      addLog(
+        `🎲 ${G.joueurs[G.cur].name} commence`,
+        'g'
+      );
+
+      addLog(
+        '📦 '+G.sac.length+' jetons dans le sac',
+        'i'
+      );
+
+      saveGame();
+      render();
+
+      if(G.joueurs[G.cur].isAI)
+          setTimeout(aiTurn,800);
+  });
   // JOURNAL
   document.getElementById('btn-ld').addEventListener('click',()=>setLog('detail'));
   document.getElementById('btn-lm').addEventListener('click',()=>setLog('min'));
