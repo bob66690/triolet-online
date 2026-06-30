@@ -53,7 +53,8 @@ function saveGame(){
     pend: G.pend,
     rejouer: G.rejouer,
     over: G.over,
-    turnCounts: G.turnCounts
+    turnCounts: G.turnCounts,
+	passCount: G.passCount
   };
   localStorage.setItem('triolet_game',JSON.stringify(data));
 }
@@ -75,7 +76,8 @@ return{
       pend: data.pend,
       rejouer: data.rejouer,
       over: data.over,
-      turnCounts: data.turnCounts
+      turnCounts: data.turnCounts,
+	passCount: data.passCount || 0
     };
   }catch(e){
     console.error('Erreur chargement partie:',e);
@@ -112,6 +114,7 @@ function newGame(configs){
     board  : Array(15).fill(null).map(()=>Array(15).fill(null)),
     sac, joueurs,
     cur    : 0,
+	passCount : 0,
 	startPlayer : 0,
     first  : true,
     usedSp : new Set(),
@@ -464,6 +467,7 @@ function playMove(){
   G.rejouer = res.rejouer;
 
   pl.score += pts;
+  G.passCount = 0;
   addLog(`✅ ${pl.name} : +${pts} pt${pts!==1?'s':''} → Total ${pl.score}`,'score');
 
   G.pend.forEach(p => {
@@ -536,16 +540,75 @@ function checkEnd(){
 }
 
 function showEnd(){
-  const sorted=[...G.joueurs].sort((a,b)=>b.score-a.score);
-  const medals=['🥇','🥈','🥉','4️⃣'];
-  document.getElementById('fin-scores').innerHTML=
-    sorted.map((j,i)=>
-      `<div class="finrow">
-         <span>${medals[i]} ${j.name}</span>
-         <span class="finpts">${j.score} pts</span>
-       </div>`
-    ).join('');
-  document.getElementById('modal-fin').classList.add('on');
+
+  const sorted = [...G.joueurs]
+    .sort((a,b)=>b.score-a.score);
+
+  let html = '';
+
+  if(sorted.length >= 3){
+
+    html += `
+      <div class="podium">
+
+        <div class="pod second">
+          <div class="medal">🥈</div>
+          <div class="pname">${sorted[1].name}</div>
+          <div class="pscore">${sorted[1].score} pts</div>
+        </div>
+
+        <div class="pod first">
+          <div class="winner">👑 VAINQUEUR 👑</div>
+          <div class="medal">🥇</div>
+          <div class="pname">${sorted[0].name}</div>
+          <div class="pscore">${sorted[0].score} pts</div>
+        </div>
+
+        <div class="pod third">
+          <div class="medal">🥉</div>
+          <div class="pname">${sorted[2].name}</div>
+          <div class="pscore">${sorted[2].score} pts</div>
+        </div>
+
+      </div>
+    `;
+
+    if(sorted[3]){
+
+      html += `
+        <div class="fourth">
+          4️⃣ ${sorted[3].name} — ${sorted[3].score} pts
+        </div>
+      `;
+    }
+
+  }else{
+
+    html += `
+      <div class="podium">
+
+        <div class="pod second">
+          <div class="medal">🥈</div>
+          <div class="pname">${sorted[1].name}</div>
+          <div class="pscore">${sorted[1].score} pts</div>
+        </div>
+
+        <div class="pod first">
+          <div class="winner">👑 VAINQUEUR 👑</div>
+          <div class="medal">🥇</div>
+          <div class="pname">${sorted[0].name}</div>
+          <div class="pscore">${sorted[0].score} pts</div>
+        </div>
+
+      </div>
+    `;
+  }
+
+  document.getElementById('fin-scores').innerHTML = html;
+
+  document
+    .getElementById('modal-fin')
+    .classList.add('on');
 }
 
 // =====================================================
@@ -627,13 +690,15 @@ const tryTriolet = hasPotentialTriolet(pl);
   let best = null, bestPts = -1;
 
 
-const handOrder = tryTriolet
-  ? [0,1,2]
-  : [0,1,2];
-
+const handOrder =
+  pl.hand.map((_,i)=>i);
+  
 for(const hi of handOrder){
 
     const tok = pl.hand[hi];
+
+    if(!tok)
+        continue;
 
     for(let r = 0; r < 15; r++){
       for(let c = 0; c < 15; c++){
@@ -711,15 +776,30 @@ if(pts > bestPts){
 
     if(G.sac.length === 0){
 
-        addLog(
-          `🤖 ${pl.name} ne trouve aucun coup et passe`,
-          'i'
-        );
+    addLog(
+      `🤖 ${pl.name} ne trouve aucun coup et passe`,
+      'i'
+    );
+
+    G.passCount++;
+
+    if(G.passCount >= G.joueurs.length){
+
+        G.over = true;
 
         saveGame();
-        finishTurn();
+
+        showEnd();
+
         return;
     }
+
+    saveGame();
+
+    finishTurn();
+
+    return;
+}
 
     if(pl.hand.length > 0){
 
