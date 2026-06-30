@@ -679,15 +679,32 @@ function aiTurn(){
     return;
   }
   
-  const hasTriolet =
-  tryThreeTileMove(pl);
 
-const hasPair =
-  tryTwoTileMove(pl);
   
 const tryTriolet = hasPotentialTriolet(pl);
 
   let best = null, bestPts = -1;
+
+const candidates = [];
+
+
+for(const pos of candidates){
+
+    const r = pos.r;
+    const c = pos.c;
+
+
+        if(G.board[r][c])
+            continue;
+
+        if(
+            G.board[7][7] === null
+            ||
+            adjFixed(r,c)
+        ){
+            candidates.push({r,c});
+        }
+    }
 
 
 const handOrder =
