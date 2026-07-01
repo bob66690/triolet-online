@@ -462,7 +462,37 @@ function playMove(){
   const res = calcPoints();
   const pts = res.pts;
   const pl = G.joueurs[G.cur];
+  
+  // == AJOUT JOURNAL DETAIL Humain
+  const detail =
+  G.pend.map(p =>
+    p.isJoker
+      ? `X(${p.jokerVal})`
+      : p.val
+  ).join('-');
 
+if(G.pend.length === 3){
+
+    addLog(
+      `🎊 TRIOLET HUMAIN : ${pl.name} joue [${detail}]`,
+      'score'
+    );
+
+}else if(G.pend.length === 2){
+
+    addLog(
+      `⚡ DOUBLE COUP : ${pl.name} joue [${detail}]`,
+      'score'
+    );
+
+}else{
+
+    addLog(
+      `🎯 COUP SIMPLE : ${pl.name} joue [${detail}]`,
+      'score'
+    );
+}
+// fin ajout journal humain
   res.usedKeys.forEach(k => G.usedSp.add(k));
   G.rejouer = res.rejouer;
 
@@ -671,40 +701,315 @@ function tryTwoTileMove(pl){
 
   return false;
 }
+
+
+// ajout 1/7/26
+function findTwoTileMove(pl){
+
+    if(pl.hand.length < 2)
+        return null;
+
+    let bestMove = null;
+    let bestPts = 0;
+
+    for(let h1=0; h1<pl.hand.length; h1++){
+
+        for(let h2=h1+1; h2<pl.hand.length; h2++){
+
+            const t1 = pl.hand[h1];
+            const t2 = pl.hand[h2];
+
+            // Horizontal
+            for(let r=0;r<15;r++){
+
+                for(let c=0;c<14;c++){
+
+                    if(G.board[r][c]) continue;
+                    if(G.board[r][c+1]) continue;
+
+                    G.pend = [
+                      {
+                        hi:h1,
+                        r:r,
+                        c:c,
+                        val:t1.val,
+                        isJoker:t1.isJoker,
+                        jokerVal:t1.isJoker ? 0 : null
+                      },
+                      {
+                        hi:h2,
+                        r:r,
+                        c:c+1,
+                        val:t2.val,
+                        isJoker:t2.isJoker,
+                        jokerVal:t2.isJoker ? 0 : null
+                      }
+                    ];
+
+                    if(validate().ok){
+
+                        const pts = calcPoints().pts;
+
+                        if(pts > bestPts){
+
+                            bestPts = pts;
+
+                            bestMove = JSON.parse(
+                                JSON.stringify(G.pend)
+                            );
+                        }
+                    }
+
+                    G.pend = [];
+                }
+            }
+
+            // Vertical
+            for(let r=0;r<14;r++){
+
+                for(let c=0;c<15;c++){
+
+                    if(G.board[r][c]) continue;
+                    if(G.board[r+1][c]) continue;
+
+                    G.pend = [
+                      {
+                        hi:h1,
+                        r:r,
+                        c:c,
+                        val:t1.val,
+                        isJoker:t1.isJoker,
+                        jokerVal:t1.isJoker ? 0 : null
+                      },
+                      {
+                        hi:h2,
+                        r:r+1,
+                        c:c,
+                        val:t2.val,
+                        isJoker:t2.isJoker,
+                        jokerVal:t2.isJoker ? 0 : null
+                      }
+                    ];
+
+                    if(validate().ok){
+
+                        const pts = calcPoints().pts;
+
+                        if(pts > bestPts){
+
+                            bestPts = pts;
+
+                            bestMove = JSON.parse(
+                                JSON.stringify(G.pend)
+                            );
+                        }
+                    }
+
+                    G.pend = [];
+                }
+            }
+        }
+    }
+
+    return bestMove;
+}
+function findThreeTileMove(pl){
+
+    if(pl.hand.length !== 3)
+        return null;
+
+    const vals = pl.hand.map(t =>
+        t.isJoker ? 0 : t.val
+    );
+
+    const sum = vals.reduce((a,b)=>a+b,0);
+
+    if(sum !== 15)
+        return null;
+
+    for(let r=0;r<15;r++){
+
+        for(let c=0;c<13;c++){
+
+            if(
+                G.board[r][c] ||
+                G.board[r][c+1] ||
+                G.board[r][c+2]
+            ) continue;
+
+            G.pend = [
+                {
+                    hi:0,
+                    r,c,
+                    val:pl.hand[0].val,
+                    isJoker:pl.hand[0].isJoker,
+                    jokerVal:null
+                },
+                {
+                    hi:1,
+                    r,c:c+1,
+                    val:pl.hand[1].val,
+                    isJoker:pl.hand[1].isJoker,
+                    jokerVal:null
+                },
+                {
+                    hi:2,
+                    r,c:c+2,
+                    val:pl.hand[2].val,
+                    isJoker:pl.hand[2].isJoker,
+                    jokerVal:null
+                }
+            ];
+
+            if(validate().ok){
+
+                const pts =
+                    calcPoints().pts;
+
+                if(pts > 0){
+
+                    const move =
+                        JSON.parse(
+                          JSON.stringify(G.pend)
+                        );
+
+                    G.pend = [];
+
+                    return move;
+                }
+            }
+
+            G.pend = [];
+        }
+    }
+
+    return null;
+}
+function playAIMove(move){
+
+    G.pend = move;
+    const res = calcPoints();
+    const pts = res.pts;
+    const pl = G.joueurs[G.cur];
+    res.usedKeys.forEach(
+        k => G.usedSp.add(k)
+    );
+
+    G.rejouer = res.rejouer;
+    pl.score += pts;
+    G.passCount = 0;
+    G.pend.forEach(p => {
+        G.board[p.r][p.c] = {
+            val:p.val,
+            isJoker:p.isJoker,
+            jokerVal:p.jokerVal
+        };
+    });
+
+    const idxs =
+      [...new Set(
+        G.pend.map(p => p.hi)
+      )]
+      .sort((a,b)=>b-a);
+
+    idxs.forEach(i =>
+      pl.hand.splice(i,1)
+    );
+
+    pl.hand.push(
+      ...drawN(G.sac,idxs.length)
+    );
+
+  // modif journal 1/7/26
+  if(move.length === 3){
+
+    addLog(
+      '🎊🎊🎊 TRIOLET DE L IA 🎊🎊🎊',
+      'score'
+    );
+}
+  const detail =
+  move.map(m =>
+    m.isJoker
+      ? `X(${m.jokerVal})`
+      : m.val
+  ).join('-');
+
+if(move.length === 3){
+
+    addLog(
+      `🎊 TRIOLET IA [${detail}] → +${pts} pts`,
+      'score'
+    );
+
+}else if(move.length === 2){
+
+    addLog(
+      `⚡ DOUBLE IA [${detail}] → +${pts} pts`,
+      'score'
+    );
+
+}else{
+
+    addLog(
+      `🎯 IA [${detail}] → +${pts} pts`,
+      'score'
+    );
+}
+  // fin modif journal 1/7/26
+
+    const rejouerNow = G.rejouer;
+    G.pend = [];
+    G.first = false;
+    G.rejouer = false;
+    saveGame();
+    if(checkEnd())
+        return;
+
+    if(rejouerNow)
+        finishTurn({samePlayer:true});
+    else
+        finishTurn();
+}
+// fin ajout 1/7/26
+
+
 function aiTurn(){
   const pl = G.joueurs[G.cur];
   if(!pl || !pl.isAI) return;
   if(pl.hand.length === 0){
+	   
     finishTurn();
     return;
   }
   
+   // ajout 1/7/26
+	  const trioletMove =
+    findThreeTileMove(pl);
+
+	if(trioletMove){
+
+		playAIMove(trioletMove);
+
+		return;
+	}
+	
+	const twoTileMove =
+    findTwoTileMove(pl);
+
+	if(twoTileMove){
+
+		playAIMove(twoTileMove);
+
+		return;
+	}
+	  // fin ajout 1/7/26
 
   
 const tryTriolet = hasPotentialTriolet(pl);
 
   let best = null, bestPts = -1;
 
-const candidates = [];
-
-
-for(const pos of candidates){
-
-    const r = pos.r;
-    const c = pos.c;
-
-
-        if(G.board[r][c])
-            continue;
-
-        if(
-            G.board[7][7] === null
-            ||
-            adjFixed(r,c)
-        ){
-            candidates.push({r,c});
-        }
-    }
 
 
 const handOrder =
