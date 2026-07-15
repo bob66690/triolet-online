@@ -1173,7 +1173,9 @@ if(evalScore > bestPts){
 function render(){
   renderBoard();
   renderHand();
-  renderScores();
+  renderScores
+  renderDistribution();
+  
   document.getElementById('sac-ct').textContent=G.sac.length;
   const pl=G.joueurs[G.cur];
   document.getElementById('turn-name').textContent=
@@ -1295,6 +1297,83 @@ function renderScores(){
          <span class="pts">${j.score}</span>
        </div>`
     ).join('');
+}
+
+// rendu de la distribution des jetons
+function renderDistribution(){
+
+    if(!G) return;
+
+    const remain = {};
+
+    Object.keys(DISTRIB).forEach(v=>{
+        remain[v] = DISTRIB[v];
+    });
+
+    let jokerRemain = 2;
+
+    G.board.forEach(row=>{
+        row.forEach(t=>{
+
+            if(!t) return;
+
+            if(t.isJoker){
+                jokerRemain--;
+            }else{
+                remain[t.val]--;
+            }
+        });
+    });
+
+    G.pend.forEach(t=>{
+
+        if(t.isJoker){
+            jokerRemain--;
+        }else{
+            remain[t.val]--;
+        }
+    });
+
+    let html = '';
+
+    for(let v=0; v<=15; v++){
+
+        html += `
+        <div class="dist-tile ${remain[v]===0?'dist-empty':''}">
+            <span class="dist-main">${v}</span>
+
+             <span class="dist-remain">
+                ${remain[v]}
+            </span>
+			<span class="dist-total">
+                ${DISTRIB[v]}
+            </span>
+
+          
+        </div>`;
+    }
+
+    html += `
+    <div class="dist-tile dist-joker ${jokerRemain===0?'dist-empty':''}">
+        <span class="dist-main">X</span>
+
+
+
+        <span class="dist-remain">
+            ${jokerRemain}
+        </span>
+		        <span class="dist-total">2</span>
+				
+    </div>`;
+
+    const zone =
+        document.getElementById(
+            'tile-distribution'
+        );
+
+    if(zone){
+        zone.innerHTML = html;
+    }
 }
 
 // =====================================================

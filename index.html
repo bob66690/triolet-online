@@ -166,7 +166,7 @@ header h1{
 }
 .game-wrap{
   display:flex;
-  gap:10px;
+  gap:2px;
   align-items:flex-start;
   justify-content:center;
   flex-wrap:wrap;
@@ -634,6 +634,139 @@ header h1{
   font-size:1rem;
   font-weight:bold;
 }
+
+.left-panel{
+    width:102px;
+    flex-shrink:0;
+margin-right:-12px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+}
+
+#tile-distribution{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:4px;
+}
+
+.dist-tile{
+    position:relative;
+
+    width:52px;
+    height:42px;
+
+    background:linear-gradient(
+        145deg,
+        #fef9e7,
+        #f5d76e
+    );
+
+    border:2px solid #c9a227;
+    border-radius:6px;
+
+    box-shadow:
+        0 3px 6px rgba(0,0,0,.35),
+        inset 0 1px 0 rgba(255,255,255,.5);
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    color:#1a1a1a;
+}
+
+.dist-main{
+    font-size:1.15rem;
+    font-weight:900;
+}
+
+.dist-remain{
+    position:absolute;
+    left:4px;
+    bottom:2px;
+
+    font-size:.65rem;
+    color:#666;
+    font-weight:700;
+}
+
+.dist-total{
+    position:absolute;
+    right:4px;
+    bottom:2px;
+
+    font-size:.72rem;
+    font-weight:900;
+}
+
+.dist-tile::after{
+    content:'';
+    position:absolute;
+    left:50%;
+    bottom:4px;
+
+    width:1px;
+    height:12px;
+
+    background:rgba(0,0,0,.25);
+}
+
+.dist-empty{
+    opacity:.35;
+    filter:grayscale(100%);
+}
+
+.dist-joker{
+    background:linear-gradient(
+        145deg,
+        #fff3e0,
+        #ffcc80
+    );
+
+    color:#dc2626;
+}
+
+@media(max-width:900px){
+
+    .game-wrap{
+        flex-direction:column;
+        align-items:center;
+    }
+
+    .left-panel{
+        width:100%;
+        margin-right:0;
+        margin-bottom:6px;
+    }
+
+    #tile-distribution{
+        display:grid;
+        grid-template-columns:repeat(9,1fr);
+        gap:2px;
+        justify-items:center;
+    }
+
+}
+
+@media(max-width:520px){
+
+    .left-panel{
+        width:96px;
+    }
+
+    .dist-tile{
+        width:42px;
+        height:32px;
+    }
+
+    .dist-main{
+        font-size:.9rem;
+    }
+}
+
+
+
 </style>
 </head>
 <body>
@@ -670,6 +803,11 @@ header h1{
 <!-- ========== JEU ========== -->
 <div id="screen-game">
   <div class="game-wrap">
+
+<!-- zone avec pions reste/total -->
+<div class="left-panel">
+    <div id="tile-distribution"></div>
+</div>
 
     <!-- Plateau + chevalet -->
     <div class="board-zone">
