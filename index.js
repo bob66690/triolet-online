@@ -306,7 +306,7 @@ function calcPoints(){
   const usedKeys = new Set();
   let rejouer = false;
 
-  const lines = affectedLines();
+  const lines = affectedLines().sort((a,b)=>b.length-a.length);
   const hasJok = G.pend.some(p => p.isJoker);
 
   // ── Cas : 1 seul jeton posé sans voisin ──
