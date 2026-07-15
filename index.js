@@ -376,14 +376,29 @@ function calcPoints(){
       for(const p of G.pend){
         if(!line.some(l => l.r === p.r && l.c === p.c)) continue;
         const sp = specAt(p.r, p.c);
-        if((sp === 'D' || sp === 'C') && mult < 2){
-          mult = 2;
-          spKey = p.r + ',' + p.c;
-        }
-        if(sp === 'T' && mult < 3){
-          mult = 3;
-          spKey = p.r + ',' + p.c;
-        }
+        const key = p.r + ',' + p.c;
+
+if(
+    (sp === 'D' || sp === 'C')
+    && mult < 2
+    && !usedKeys.has(key)
+){
+    mult = 2;
+    spKey = key;
+
+    usedKeys.add(key);
+}
+
+if(
+    sp === 'T'
+    && mult < 3
+    && !usedKeys.has(key)
+){
+    mult = 3;
+    spKey = key;
+
+    usedKeys.add(key);
+}
       }
 
       let pts = 30 * mult;
@@ -398,9 +413,7 @@ function calcPoints(){
         msg += ` (joker inclus — pas de bonus triolet)`;
       }
 
-      if(spKey){
-        usedKeys.add(spKey);
-      }
+      
 
       total += pts;
       addLog(msg, 'p');
