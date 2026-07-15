@@ -1436,10 +1436,31 @@ function openEch(){
   if(G.joueurs[G.cur].isAI)return;
   if(G.pend.length>0){addLog('Annulez vos placements avant d\'échanger','b');return;}
 if(G.sac.length < 5){
+
+    const pl = G.joueurs[G.cur];
+
     addLog(
-      "❌ Échange interdit : moins de 5 jetons dans le sac",
-      "b"
+        `⏭️ ${pl.name} passe son tour (moins de 5 jetons dans le sac)`,
+        'i'
     );
+
+    G.passCount++;
+
+    if(G.passCount >= G.joueurs.length){
+
+        G.over = true;
+
+        saveGame();
+
+        showEnd();
+
+        return;
+    }
+
+    saveGame();
+
+    finishTurn();
+
     return;
 }
   echSel=[];
