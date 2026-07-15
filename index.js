@@ -413,24 +413,60 @@ function calcPoints(){
         const sv = scoreVal(item.tok);
         const isNew = G.pend.some(p => p.r === item.r && p.c === item.c);
 
-        if(isNew){
-          const sp = specAt(item.r, item.c);
-          if(sp === 'D' || sp === 'C'){
-            pts += sv * 2;
-            usedKeys.add(item.r + ',' + item.c);
-            detail.push(item.tok.isJoker ? `X(×2=0)` : `${sv}×2=${sv*2}`);
-          }else if(sp === 'T'){
-            pts += sv * 3;
-            usedKeys.add(item.r + ',' + item.c);
-            detail.push(item.tok.isJoker ? `X(×3=0)` : `${sv}×3=${sv*3}`);
-          }else{
-            pts += sv;
-            detail.push(item.tok.isJoker ? `X(=0)` : `${sv}`);
-          }
-        }else{
-          pts += sv;
-          detail.push(`${sv}`);
-        }
+if(isNew){
+
+    const sp = specAt(item.r, item.c);
+    const key = item.r + ',' + item.c;
+
+    // La case spéciale a déjà été utilisée
+    // par une autre ligne (trio, paire, etc.)
+    if(usedKeys.has(key)){
+        pts += sv;
+        detail.push(`${sv}`);
+        return;
+    }
+
+    if(sp === 'D' || sp === 'C'){
+
+        pts += sv * 2;
+
+        usedKeys.add(key);
+
+        detail.push(
+            item.tok.isJoker
+                ? 'X(×2=0)'
+                : `${sv}×2=${sv*2}`
+        );
+
+    }else if(sp === 'T'){
+
+        pts += sv * 3;
+
+        usedKeys.add(key);
+
+        detail.push(
+            item.tok.isJoker
+                ? 'X(×3=0)'
+                : `${sv}×3=${sv*3}`
+        );
+
+    }else{
+
+        pts += sv;
+
+        detail.push(
+            item.tok.isJoker
+                ? 'X(=0)'
+                : `${sv}`
+        );
+    }
+
+}else{
+
+    pts += sv;
+    detail.push(`${sv}`);
+}
+
       });
 
       total += pts;
