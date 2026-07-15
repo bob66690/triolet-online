@@ -1173,7 +1173,7 @@ if(evalScore > bestPts){
 function render(){
   renderBoard();
   renderHand();
-  renderScores
+  renderScores();
   renderDistribution();
   
   document.getElementById('sac-ct').textContent=G.sac.length;
