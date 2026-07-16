@@ -576,8 +576,12 @@ if(G.pend.length === 3){
 //  TOUR SUIVANT
 // =====================================================
 function nextTurn(){
+	
   G.cur=(G.cur+1)%G.joueurs.length;
-  G.pend=[];selIdx=null;
+  
+  G.pend=[];
+  selIdx=null;
+  saveGame(); // AJOUT
   render();
   if(G.joueurs[G.cur].isAI)setTimeout(aiTurn,800);
 }
@@ -586,6 +590,7 @@ function finishTurn({samePlayer=false}={}){
   G.turnCounts[G.cur]=(G.turnCounts[G.cur]||0)+1;
   if(samePlayer){
     G.pend=[];selIdx=null;
+	saveGame(); // AJOUT
     render();
     if(G.joueurs[G.cur].isAI)setTimeout(aiTurn,800);
     return;
