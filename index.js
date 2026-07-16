@@ -788,7 +788,7 @@ function findTwoTileMove(pl){
                         c:c,
                         val:t1.val,
                         isJoker:t1.isJoker,
-                        jokerVal:t1.isJoker ? 0 : null
+                        jokerVal:t1.isJoker ? 15 : null
                       },
                       {
                         hi:h2,
@@ -796,7 +796,7 @@ function findTwoTileMove(pl){
                         c:c+1,
                         val:t2.val,
                         isJoker:t2.isJoker,
-                        jokerVal:t2.isJoker ? 0 : null
+                        jokerVal:t2.isJoker ? 15 : null
                       }
                     ];
 
@@ -833,7 +833,7 @@ function findTwoTileMove(pl){
                         c:c,
                         val:t1.val,
                         isJoker:t1.isJoker,
-                        jokerVal:t1.isJoker ? 0 : null
+                        jokerVal:t1.isJoker ? 15 : null
                       },
                       {
                         hi:h2,
@@ -841,7 +841,7 @@ function findTwoTileMove(pl){
                         c:c,
                         val:t2.val,
                         isJoker:t2.isJoker,
-                        jokerVal:t2.isJoker ? 0 : null
+                        jokerVal:t2.isJoker ? 15 : null
                       }
                     ];
 
@@ -872,14 +872,27 @@ function findThreeTileMove(pl){
     if(pl.hand.length !== 3)
         return null;
 
-    const vals = pl.hand.map(t =>
-        t.isJoker ? 0 : t.val
-    );
+ const nonJokerSum =
+    pl.hand
+      .filter(t => !t.isJoker)
+      .reduce((a,t)=>a+t.val,0);
 
-    const sum = vals.reduce((a,b)=>a+b,0);
+const jokerCount =
+    pl.hand.filter(t => t.isJoker).length;
 
-    if(sum !== 15)
+if(jokerCount === 0){
+
+    if(nonJokerSum !== 15)
         return null;
+
+}else if(jokerCount === 1){
+
+    const needed = 15 - nonJokerSum;
+
+    if(needed < 0 || needed > 15)
+        return null;
+}
+
 
     for(let r=0;r<15;r++){
 
@@ -897,21 +910,30 @@ function findThreeTileMove(pl){
                     r,c,
                     val:pl.hand[0].val,
                     isJoker:pl.hand[0].isJoker,
-                    jokerVal:null
+                    jokerVal:
+    pl.hand[0].isJoker
+        ? (15 - nonJokerSum)
+        : null
                 },
                 {
                     hi:1,
                     r,c:c+1,
                     val:pl.hand[1].val,
                     isJoker:pl.hand[1].isJoker,
-                    jokerVal:null
+                jokerVal:
+    pl.hand[1].isJoker
+        ? (15 - nonJokerSum)
+        : null
                 },
                 {
                     hi:2,
                     r,c:c+2,
                     val:pl.hand[2].val,
                     isJoker:pl.hand[2].isJoker,
-                    jokerVal:null
+                   jokerVal:
+    pl.hand[2].isJoker
+        ? (15 - nonJokerSum)
+        : null
                 }
             ];
 
