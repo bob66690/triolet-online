@@ -1280,18 +1280,79 @@ function renderBoard(){
         const lbl=document.createElement('div');
         lbl.className='cell-lbl';
         if(sp==='R'){
-          lbl.innerHTML=
-            `<svg viewBox="0 0 24 24" fill="white" opacity="0.92">
-              <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6s-2.69
-              6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58
-              8-8-3.58-8-8-8z"/>
-            </svg>`;
-        }else{
-          const txt=document.createElement('span');
-          txt.className='cell-lbl-text';
-          txt.textContent=(sp==='D'||sp==='C')?'×2':'×3';
-          lbl.appendChild(txt);
-        }
+
+  lbl.innerHTML=
+    `<svg viewBox="0 0 24 24" fill="white" opacity="0.92">
+      <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6s-2.69
+      6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58
+      8-8-3.58-8-8-8z"/>
+    </svg>`;
+
+}
+else if(sp==='C'){
+
+  lbl.innerHTML=
+    `<svg viewBox="0 0 100 100">
+
+      <path
+        fill="white"
+
+        d="
+        M50 10
+
+        L42 22
+        H48
+        V40
+
+        H30
+        V34
+
+        L15 50
+
+        L30 66
+        V60
+        H48
+
+        V78
+        H42
+
+        L50 90
+
+        L58 78
+        H52
+
+        V60
+        H70
+
+        V66
+        L85 50
+
+        L70 34
+        V40
+
+        H52
+        V22
+
+        H58
+        Z
+        "/>
+
+    </svg>`;
+
+}
+else{
+
+  const txt=document.createElement('span');
+
+  txt.className='cell-lbl-text';
+
+  txt.textContent=
+      (sp==='D')
+      ? '×2'
+      : '×3';
+
+  lbl.appendChild(txt);
+}
         cell.appendChild(lbl);
       }
 
