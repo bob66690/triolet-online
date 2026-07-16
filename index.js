@@ -1258,12 +1258,13 @@ if(evalScore > bestPts){
 
         const t = pl.hand.splice(idx,1);
 
-        G.sac.push(...t);
+// Pioche avant de remettre le jeton
+const nouveau = drawN(G.sac,1);
 
-        shuffle(G.sac);
+G.sac.push(...t);
+shuffle(G.sac);
 
-        pl.hand.push(...drawN(G.sac,1));
-
+pl.hand.push(...nouveau);
         addLog(
           `🤖 ${pl.name} échange un jeton`,
           'i'
@@ -1651,11 +1652,19 @@ function confirmEch(){
     return;
   }
 
-  const sorted=[...echSel].sort((a,b)=>b-a);
-  const removed=sorted.map(i=>pl.hand.splice(i,1)[0]);
-  G.sac.push(...removed);shuffle(G.sac);
-  pl.hand.push(...drawN(G.sac,removed.length));
-  addLog(`🔄 Échange de ${removed.length} jeton(s)`,'i');
+ const sorted=[...echSel].sort((a,b)=>b-a);
+const removed=sorted.map(i=>pl.hand.splice(i,1)[0]);
+
+// Pioche d'abord
+const nouveaux =
+    drawN(G.sac, removed.length);
+
+// Puis remet les jetons échangés dans le sac
+G.sac.push(...removed);
+shuffle(G.sac);
+
+// Ajoute les nouveaux jetons à la main
+pl.hand.push(...nouveaux); addLog(`🔄 Échange de ${removed.length} jeton(s)`,'i');
   document.getElementById('modal-ech').classList.remove('on');
   echSel=[];
   saveGame();
