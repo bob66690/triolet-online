@@ -228,11 +228,11 @@ header h1{
   grid-template-columns:repeat(15,var(--cs));
   grid-template-rows:repeat(15,var(--cs));
   gap:1px;
-  background:#0a1f4a;
+  background:#86b2f2;
 }
 .cell{
   width:var(--cs);height:var(--cs);
-  background:#1d56ad;
+  background:#2459b6;
   display:flex;
   align-items:center;
   justify-content:center;
@@ -243,7 +243,7 @@ header h1{
   -webkit-tap-highlight-color:transparent;
   overflow:hidden;
 }
-.cell:hover{background:#2666c7;}
+.cell:hover{background:#2c67cb;}
 .cell.sp-R{
   background:#6c4c8d;
   box-shadow:inset 0 0 0 2px #d8c8e6;
@@ -257,10 +257,15 @@ header h1{
   box-shadow:inset 0 0 0 2px #dcefdc;
 }
 .cell.sp-C{
-  background:#f2a523;
-  box-shadow:
-     inset 0 0 0 2px #ffe0a6,
-     inset 0 0 0 4px rgba(255,255,255,.35);
+    background:#f5a623;
+
+    box-shadow:
+        inset 0 0 0 2px rgba(255,255,255,.7),
+        inset 0 0 0 4px rgba(255,255,255,.3);
+}
+.cell.sp-C .cell-lbl svg{
+    width:80%;
+    height:80%;
 }
 .cell.placeable{
   background:#14532d !important;
@@ -310,8 +315,22 @@ header h1{
   user-select:none;
   line-height:1;
 }
+.tok{
+    background:
+      linear-gradient(
+         145deg,
+         #fffdf1,
+         #f5d76e
+      );
+}
 .tok.joker{
   background:linear-gradient(145deg,#fff3e0,#ffcc80);
+     background:
+      linear-gradient(
+         145deg,
+         #fffdf1,
+         #f5d76e
+      );
   color:#dc2626;
   font-weight:900;
 }
@@ -727,7 +746,7 @@ margin-right:-12px;
 }
 
 .dist-empty{
-    opacity:.35;
+    opacity:.15;
     filter:grayscale(100%);
 }
 
@@ -779,6 +798,45 @@ margin-right:-12px;
     }
 }
 
+.last-play{
+
+    box-shadow:
+        0 0 0 3px #22c55e,
+        0 0 10px #22c55e;
+
+}
+
+@keyframes trioletFlash{
+
+    0%{
+        transform:scale(1);
+        box-shadow:none;
+    }
+
+    25%{
+        transform:scale(1.08);
+        box-shadow:0 0 25px gold;
+    }
+
+    50%{
+        transform:scale(1.12);
+        box-shadow:0 0 50px gold;
+    }
+
+    75%{
+        transform:scale(1.08);
+        box-shadow:0 0 25px gold;
+    }
+
+    100%{
+        transform:scale(1);
+        box-shadow:none;
+    }
+}
+
+.triolet-flash{
+    animation:trioletFlash 2s ease;
+}
 
 
 </style>
@@ -943,6 +1001,10 @@ margin-right:-12px;
 
   </div>
 </div>
+<div id="triolet-banner">
+    🎉 TRIOLET ! 🎉
+</div>
+
 <script src="index.js"></script>
 </body>
 </html>

@@ -409,6 +409,29 @@ if(
       if(isTriolet && lineIdx === trioletLineId && !hasJok){
         pts += 50;
         msg = `🎉 TRIOLET ! ${msg} + 50 bonus = ${pts} pts`;
+		const b =
+    document.getElementById(
+        'triolet-banner'
+    );
+
+if(b){
+
+    b.style.opacity = '1';
+
+    setTimeout(()=>{
+        b.style.opacity = '0';
+    },2000);
+}
+		document
+  .querySelector('.board-shell')
+  ?.classList.add('triolet-flash');
+
+setTimeout(()=>{
+  document
+    .querySelector('.board-shell')
+    ?.classList.remove('triolet-flash');
+},800);
+
       }else if(hasJok){
         msg += ` (joker inclus — pas de bonus triolet)`;
       }
@@ -549,9 +572,21 @@ if(G.pend.length === 3){
   G.passCount = 0;
   addLog(`✅ ${pl.name} : +${pts} pt${pts!==1?'s':''} → Total ${pl.score}`,'score');
 
-  G.pend.forEach(p => {
-    G.board[p.r][p.c] = {val:p.val, isJoker:p.isJoker, jokerVal:p.jokerVal};
-  });
+  G.lastMove = [];
+
+G.pend.forEach(p => {
+
+    G.board[p.r][p.c] = {
+        val:p.val,
+        isJoker:p.isJoker,
+        jokerVal:p.jokerVal
+    };
+
+    G.lastMove.push({
+        r:p.r,
+        c:p.c
+    });
+});
 
   const idxs = [...new Set(G.pend.map(p => p.hi))].sort((a,b) => b-a);
   idxs.forEach(i => pl.hand.splice(i,1));
@@ -1272,6 +1307,11 @@ function renderBoard(){
       if(!used&&sp)cell.classList.add('sp-'+sp);
 
       const boardTok=G.board[r][c];
+	  const isLastMove =
+    G.lastMove &&
+    G.lastMove.some(
+      x => x.r===r && x.c===c
+    );
       const pendTok=G.pend.find(p=>p.r===r&&p.c===c);
 
       // Afficher le label de la case spéciale UNIQUEMENT si la case est vraiment vide
@@ -1291,54 +1331,22 @@ function renderBoard(){
 }
 else if(sp==='C'){
 
-  lbl.innerHTML=
-    `<svg viewBox="0 0 100 100">
+  lbl.innerHTML = `
+  <svg viewBox="0 0 100 100">
 
-      <path
-        fill="white"
+    <polygon points="50,10 40,28 60,28" fill="white"/>
+    <polygon points="50,90 40,72 60,72" fill="white"/>
 
-        d="
-        M50 10
+    <polygon points="10,50 28,40 28,60" fill="white"/>
+    <polygon points="90,50 72,40 72,60" fill="white"/>
 
-        L42 22
-        H48
-        V40
+    <circle
+      cx="50"
+      cy="50"
+      r="8"
+      fill="white"/>
 
-        H30
-        V34
-
-        L15 50
-
-        L30 66
-        V60
-        H48
-
-        V78
-        H42
-
-        L50 90
-
-        L58 78
-        H52
-
-        V60
-        H70
-
-        V66
-        L85 50
-
-        L70 34
-        V40
-
-        H52
-        V22
-
-        H58
-        Z
-        "/>
-
-    </svg>`;
-
+  </svg>`;
 }
 else{
 
@@ -1357,7 +1365,14 @@ else{
       }
 
       if(boardTok){
-        cell.appendChild(makeTok(boardTok,false));
+       const tk =
+    makeTok(boardTok,false);
+
+if(isLastMove){
+    tk.classList.add('last-play');
+}
+
+cell.appendChild(tk);
       }else if(pendTok){
         const tk=makeTok(
           {val:pendTok.val,isJoker:pendTok.isJoker,jokerVal:pendTok.jokerVal},
@@ -1655,7 +1670,7 @@ function addLog(msg,type){
   p.textContent=msg;
   p.className={score:'lg',g:'lg',b:'lb',i:'li',p:'lp'}[type]||'';
   box.prepend(p);
-  while(box.children.length>40)box.removeChild(box.lastChild);
+  while(box.children.length>100)box.removeChild(box.lastChild);
 }
 function setLog(mode){
   logMode=mode;
@@ -1913,8 +1928,10 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('btn-lm').addEventListener('click',()=>setLog('min'));
 
   // ── CHARGEMENT PARTIE SAUVEGARDÉE ──
-  const saved=loadGame();
-  if(saved){
+const saved = loadGame();
+
+if(saved && confirm("Reprendre la partie en cours ?")){
+
     // Une partie est en cours
     G=saved;
     document.getElementById('screen-lobby').style.display='none';

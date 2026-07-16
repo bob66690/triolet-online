@@ -68,4 +68,27 @@ button {
     text-align: center;
 }
 
+#triolet-banner{
 
+    position:fixed;
+
+    top:50%;
+    left:50%;
+
+    transform:translate(-50%,-50%);
+
+    font-size:4rem;
+    font-weight:900;
+
+    color:gold;
+
+    text-shadow:
+        0 0 10px #fff,
+        0 0 20px gold,
+        0 0 40px orange;
+
+    z-index:9999;
+
+    opacity:0;
+    pointer-events:none;
+}
