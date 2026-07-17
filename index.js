@@ -409,10 +409,30 @@ if(
       if(isTriolet && lineIdx === trioletLineId && !hasJok){
         pts += 50;
         msg = `🎉 TRIOLET ! ${msg} + 50 bonus = ${pts} pts`;
-		const b =
+		
+		
+	const b =
     document.getElementById(
         'triolet-banner'
     );
+
+const board =
+    document.querySelector(
+        '.board-shell'
+    );
+
+if(board){
+
+    board.classList.add(
+        'triolet-flash'
+    );
+
+    setTimeout(()=>{
+        board.classList.remove(
+            'triolet-flash'
+        );
+    },3500);
+}
 
 if(b){
 
@@ -420,17 +440,8 @@ if(b){
 
     setTimeout(()=>{
         b.style.opacity = '0';
-    },2000);
-}
-		document
-  .querySelector('.board-shell')
-  ?.classList.add('triolet-flash');
-
-setTimeout(()=>{
-  document
-    .querySelector('.board-shell')
-    ?.classList.remove('triolet-flash');
-},800);
+    },3500);
+}	
 
       }else if(hasJok){
         msg += ` (joker inclus — pas de bonus triolet)`;
